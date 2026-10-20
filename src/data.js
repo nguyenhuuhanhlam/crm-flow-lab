@@ -1,5 +1,6 @@
-// Dữ liệu mẫu ĐƠN GIẢN — giai đoạn 1 chỉ có 3 loại thực thể:
-//   Công ty -> Bộ môn (phòng ban) -> Nhân viên
+// Dữ liệu mẫu — mở rộng dần theo giai đoạn:
+//   Giai đoạn 1: Công ty -> Bộ môn (phòng ban) -> Nhân viên
+//   Giai đoạn 2: thêm Công việc được giao, gắn dưới Nhân viên (Nhân viên -> Công việc)
 // Công Ty Miền Tây hoạt động trong lĩnh vực xây dựng — thí nghiệm vật liệu,
 // nên các bộ môn là các bộ môn chuyên ngành thí nghiệm.
 // Trong sản phẩm thật: nodes đến từ các bảng companies/departments/employees,
@@ -9,6 +10,7 @@ export const TYPE_META = {
   company:    { label: 'Công ty', icon: '🏢', color: '#2563eb', bg: '#eff6ff', border: '#93c5fd', darkColor: '#60a5fa', darkBg: '#172554', darkBorder: '#1d4ed8' },
   department: { label: 'Bộ môn', icon: '🗂️', color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', darkColor: '#34d399', darkBg: '#022c22', darkBorder: '#047857' },
   employee:   { label: 'Nhân viên', icon: '👤', color: '#d97706', bg: '#fffbeb', border: '#fcd34d', darkColor: '#fbbf24', darkBg: '#451a03', darkBorder: '#b45309' },
+  task:       { label: 'Công việc', icon: '📋', color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd', darkColor: '#a78bfa', darkBg: '#2e1065', darkBorder: '#6d28d9' },
 }
 
 export const initialNodesData = [
@@ -32,6 +34,13 @@ export const initialNodesData = [
   { id: 'emp-nam', type: 'employee', title: 'Hoàng Hải Nam', subtitle: 'Thí nghiệm viên', status: 'Đang làm việc', value: 'nam@mientay.example', note: '', collapsed: true },
   { id: 'emp-oanh', type: 'employee', title: 'Lý Kim Oanh', subtitle: 'Trưởng bộ môn Hiện trường & Kiểm định', status: 'Đang làm việc', value: 'oanh@mientay.example', note: '', collapsed: true },
   { id: 'emp-phuc', type: 'employee', title: 'Trịnh Gia Phúc', subtitle: 'Kỹ thuật viên hiện trường', status: 'Đang làm việc', value: 'phuc@mientay.example', note: '', collapsed: true },
+
+  // Công việc được giao — gắn dưới nhân viên, ban đầu thu gọn theo nhân viên
+  { id: 'task-duyetkq', type: 'task', title: 'Duyệt kết quả thí nghiệm bê tông lô 12', subtitle: 'Hạn: 21-10-2026', status: 'Chưa bắt đầu', value: 'Ưu tiên: Trung bình', note: 'Kiểm tra và ký duyệt phiếu kết quả thí nghiệm cường độ bê tông.', collapsed: true },
+  { id: 'task-nenmau', type: 'task', title: 'Nén mẫu bê tông 28 ngày — CT cầu mẫu', subtitle: 'Hạn: 24-10-2026', status: 'Đang làm', value: 'Ưu tiên: Cao', note: 'Nén 6 tổ mẫu, lập phiếu kết quả trong ngày.', collapsed: true },
+  { id: 'task-damchat', type: 'task', title: 'Thí nghiệm đầm chặt đất nền — CT khu dân cư mẫu', subtitle: 'Hạn: 20-10-2026', status: 'Quá hạn', value: 'Ưu tiên: Cao', note: 'Đã quá hạn — cần xử lý trước tiên.', collapsed: true },
+  { id: 'task-kehoach', type: 'task', title: 'Lập kế hoạch kiểm định hiện trường tuần 43', subtitle: 'Hạn: 22-10-2026', status: 'Chưa bắt đầu', value: 'Ưu tiên: Trung bình', note: 'Phân công đội hiện trường cho các công trình trong tuần.', collapsed: true },
+  { id: 'task-sieuam', type: 'task', title: 'Siêu âm cọc tại công trường — CT đường mẫu', subtitle: 'Hạn: 23-10-2026', status: 'Đang làm', value: 'Ưu tiên: Cao', note: 'Mang máy siêu âm, kiểm tra 12 cọc theo bản vẽ.', collapsed: true },
 ]
 
 export const initialEdgesData = [
@@ -53,4 +62,10 @@ export const initialEdgesData = [
   { id: 'e16', source: 'emp-phuc', target: 'dept-hientruong', label: 'thuộc bộ môn' },
   // Quan hệ KIÊM NHIỆM (phụ) — vẽ nét đứt, không tham gia thu/mở nhánh chính
   { id: 'e17', source: 'emp-dung', target: 'dept-hientruong', label: 'kiêm nhiệm', secondary: true },
+  // Công việc -> nhân viên được giao
+  { id: 'e18', source: 'task-duyetkq', target: 'emp-cuong', label: 'giao cho' },
+  { id: 'e19', source: 'task-nenmau', target: 'emp-dung', label: 'giao cho' },
+  { id: 'e20', source: 'task-damchat', target: 'emp-lan', label: 'giao cho' },
+  { id: 'e21', source: 'task-kehoach', target: 'emp-oanh', label: 'giao cho' },
+  { id: 'e22', source: 'task-sieuam', target: 'emp-phuc', label: 'giao cho' },
 ]

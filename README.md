@@ -10,13 +10,17 @@ npm run dev
 # mở http://127.0.0.1:5178
 ```
 
-## Dữ liệu — giai đoạn 1 (đơn giản, sẽ mở rộng dần)
+## Dữ liệu — mở rộng dần theo giai đoạn
 
-Chỉ 3 loại thực thể:
+Giai đoạn 1 — 3 loại thực thể:
 
 - **Công ty**: Công Ty Miền Tây (node trung tâm)
 - **Bộ môn (phòng ban)**: Ban Giám Đốc, Bộ môn Bê tông & Xi măng, Bộ môn Cơ học Đất, Bộ môn Thép & Vật liệu xây, Bộ môn Hiện trường & Kiểm định — trực thuộc công ty
 - **Nhân viên**: 11 người, mỗi người thuộc 1 bộ môn (ban đầu thu gọn trong bộ môn)
+
+Giai đoạn 2 — thêm loại thứ 4:
+
+- **Công việc (được giao)**: 5 công việc mẫu gắn dưới nhân viên phụ trách (quan hệ "giao cho"), có hạn hoàn thành, mức ưu tiên và trạng thái (Chưa bắt đầu / Đang làm / Quá hạn); ban đầu thu gọn theo nhân viên — mở nhân viên ra mới thấy công việc của người đó.
 
 Quan hệ: Bộ môn → trực thuộc → Công ty; Nhân viên → thuộc bộ môn → Bộ môn.
 

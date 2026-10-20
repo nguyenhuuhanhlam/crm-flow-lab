@@ -114,7 +114,7 @@ function Flow() {
   useEffect(() => {
     if (initDone.current) return
     initDone.current = true
-    const saved = (() => { try { return JSON.parse(localStorage.getItem('crm-node-proto-v4') || 'null') } catch { return null } })()
+    const saved = (() => { try { return JSON.parse(localStorage.getItem('crm-node-proto-v5') || 'null') } catch { return null } })()
     const hidden = new Set(initialNodesData.filter(n => n.collapsed).map(n => n.id))
     let ns = initialNodesData.map(d => toFlowNode(d, hidden))
     let es = initialEdgesData.map(e => ({ ...e, animated: false, style: e.secondary ? { stroke: '#d97706', strokeWidth: 2, strokeDasharray: '7 5' } : { stroke: '#94a3b8' }, labelStyle: { fontSize: 11, fill: e.secondary ? '#d97706' : '#64748b', fontWeight: e.secondary ? 700 : 400 } }))
@@ -248,9 +248,18 @@ function Flow() {
         ['Trưởng bộ môn', lead?.data.title || 'Chưa phân công'], ['Số nhân viên', String(members.length)], ['Chức năng', d.note || '—'],
       ]
     }
+    if (d.type === 'task') {
+      const assignee = parentOf(n.id)
+      const dept = assignee ? parentOf(assignee.id) : null
+      return [
+        ['Mã công việc', `CV-${code}`], ['Nội dung', d.note || '—'], ['Người được giao', assignee?.data.title || '—'],
+        ['Thuộc bộ môn', dept?.data.title || '—'], ['Hạn hoàn thành', d.subtitle.replace('Hạn: ', '')], ['Mức ưu tiên', d.value.replace('Ưu tiên: ', '')], ['Trạng thái', d.status],
+      ]
+    }
     const rows = [
       ['Mã nhân viên', `NV-${code}`], ['Chức vụ', d.subtitle], ['Thuộc bộ môn (chính)', parentOf(n.id)?.data.title || '—'],
       ['Email', d.value || '—'], ['Điện thoại', '0900 000 000 (mẫu)'], ['Ngày vào làm', '04-01-2021 (mẫu)'], ['Trạng thái', d.status],
+      ['Công việc được giao', `${childrenOf(n.id).length} công việc`],
     ]
     if (d.concurrent) rows.splice(3, 0, ['Kiêm nhiệm', `Bộ môn ${d.concurrent} — vai trò: Thí nghiệm viên hiện trường, từ 01-09-2026 (mẫu)`])
     return rows
@@ -260,6 +269,7 @@ function Flow() {
     const t = n.data.type
     if (t === 'company') return [['18-10-2026', 'Cập nhật thông tin công ty'], ['02-10-2026', 'Hoàn thành hiệu chuẩn định kỳ thiết bị thí nghiệm'], ['15-09-2026', 'Ký hợp đồng thí nghiệm vật liệu mới']]
     if (t === 'department') return [['17-10-2026', 'Tiếp nhận đợt mẫu thí nghiệm mới'], ['08-10-2026', 'Hoàn thành báo cáo thí nghiệm kỳ trước'], ['28-09-2026', 'Bảo trì thiết bị trong bộ môn']]
+    if (t === 'task') return [['19-10-2026', 'Công việc được giao cho nhân viên phụ trách'], ['20-10-2026', 'Cập nhật tiến độ thực hiện'], ['21-10-2026', 'Nhắc hạn hoàn thành']]
     return [['16-10-2026', 'Cập nhật hồ sơ cá nhân'], ['05-10-2026', 'Hoàn thành nhiệm vụ thí nghiệm được giao'], ['20-09-2026', 'Tham gia đào tạo an toàn phòng thí nghiệm']]
   }
 
@@ -267,6 +277,7 @@ function Flow() {
     const t = n.data.type
     if (t === 'company') return [['Giấy chứng nhận đăng ký doanh nghiệp.pdf', 'PDF • 1,2 MB • 10-01-2024'], ['Quyết định công nhận phòng thí nghiệm LAS-XD.pdf', 'PDF • 860 KB • 22-05-2024'], ['Hồ sơ năng lực công ty.pdf', 'PDF • 4,5 MB • 03-02-2026']]
     if (t === 'department') return [['Quy trình thí nghiệm của bộ môn.pdf', 'PDF • 2,1 MB • 14-03-2025'], ['Danh mục thiết bị thí nghiệm.xlsx', 'Excel • 320 KB • 30-08-2026'], ['Sổ tay chất lượng bộ môn.pdf', 'PDF • 1,7 MB • 12-01-2026']]
+    if (t === 'task') return [['Phiếu giao việc.pdf', 'PDF • 210 KB • 19-10-2026'], ['Biểu mẫu kết quả thí nghiệm.xlsx', 'Excel • 150 KB • 19-10-2026'], ['Hình ảnh hiện trường.zip', 'ZIP • 8,4 MB • 20-10-2026']]
     return [['Hồ sơ nhân viên.pdf', 'PDF • 940 KB • 04-01-2021'], ['Chứng chỉ thí nghiệm viên.pdf', 'PDF • 410 KB • 18-06-2023'], ['Hợp đồng lao động.pdf', 'PDF • 620 KB • 04-01-2021']]
   }
 
@@ -308,10 +319,10 @@ function Flow() {
     const builtin = new Set(initialNodesData.map(n => n.id))
     const extraNodes = nodes.filter(n => !builtin.has(n.id))
     const extraEdges = edges.filter(e => !initialEdgesData.some(x => x.id === e.id))
-    localStorage.setItem('crm-node-proto-v4', JSON.stringify({ nodes: nodes.map(n => ({ id: n.id, position: n.position })), extraNodes, extraEdges }))
+    localStorage.setItem('crm-node-proto-v5', JSON.stringify({ nodes: nodes.map(n => ({ id: n.id, position: n.position })), extraNodes, extraEdges }))
     alert('Đã lưu vị trí + node mới vào trình duyệt (localStorage). Tải lại trang sẽ khôi phục.')
   }
-  const reset = () => { localStorage.removeItem('crm-node-proto-v4'); location.reload() }
+  const reset = () => { localStorage.removeItem('crm-node-proto-v5'); location.reload() }
 
   const doSearch = () => {
     const q = query.trim().toLowerCase(); if (!q) return
