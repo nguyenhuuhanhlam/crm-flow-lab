@@ -70,6 +70,8 @@ const ICONS = {
   collapse: (<><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" /></>),
   save: (<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></>),
   reset: (<><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></>),
+  chevronRight: (<><polyline points="9 18 15 12 9 6" /></>),
+  chevronLeft: (<><polyline points="15 18 9 12 15 6" /></>),
 }
 function IconBtn({ icon, label, onClick }) {
   return (
@@ -214,6 +216,19 @@ function Flow() {
   const [panelTab, setPanelTab] = useState('tongquan')
   useEffect(() => { setPanelTab('tongquan') }, [selectedId])
 
+  // ----- Panel phải: thu gọn + kéo ngang đổi độ rộng (lưu localStorage) -----
+  const [panelW, setPanelW] = useState(() => { try { return JSON.parse(localStorage.getItem('crm-panel') || '{}').w || 330 } catch { return 330 } })
+  const [panelCollapsed, setPanelCollapsed] = useState(() => { try { return !!JSON.parse(localStorage.getItem('crm-panel') || '{}').collapsed } catch { return false } })
+  useEffect(() => { localStorage.setItem('crm-panel', JSON.stringify({ w: panelW, collapsed: panelCollapsed })) }, [panelW, panelCollapsed])
+
+  const startResize = (e) => {
+    e.preventDefault()
+    const onMove = (ev) => setPanelW(Math.min(700, Math.max(260, window.innerWidth - ev.clientX)))
+    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); document.body.style.cursor = ''; document.body.style.userSelect = '' }
+    document.body.style.cursor = 'ew-resize'; document.body.style.userSelect = 'none'
+    window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp)
+  }
+
   const childrenOf = (id) => edges.filter(e => e.target === id).map(e => nodes.find(n => n.id === e.source)).filter(Boolean)
   const parentOf = (id) => { const e = edges.find(x => x.source === id); return e ? nodes.find(n => n.id === e.target) : null }
 
@@ -348,7 +363,7 @@ function Flow() {
           <ReactFlow
             nodes={visibleNodes} edges={visibleEdges}
             onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
-            onNodeClick={(_, n) => setSelectedId(n.id)} onPaneClick={() => setSelectedId(null)}
+            onNodeClick={(_, n) => { setSelectedId(n.id); setPanelCollapsed(false) }} onPaneClick={() => setSelectedId(null)}
             nodeTypes={nodeTypes} fitView minZoom={0.2} maxZoom={1.8}
             colorMode={dark ? 'dark' : 'light'}
           >
@@ -356,9 +371,20 @@ function Flow() {
             <Controls />
             <MiniMap pannable zoomable />
           </ReactFlow>
+          {panelCollapsed && (
+            <button className="panel-reopen" onClick={() => setPanelCollapsed(false)} title="Mở panel thông tin" aria-label="Mở panel thông tin">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{ICONS.chevronLeft}</svg>
+            </button>
+          )}
         </div>
 
-        <aside className="panel">
+        {!panelCollapsed && <div className="panel-resizer" onMouseDown={startResize} title="Kéo để đổi độ rộng panel" />}
+        {!panelCollapsed && (
+        <aside className="panel" style={{ width: panelW }}>
+          <div className="panel-head">
+            <span>Thông tin node</span>
+            <IconBtn icon="chevronRight" label="Thu gọn panel" onClick={() => setPanelCollapsed(true)} />
+          </div>
           {!selected ? (
             <div className="panel-empty">
               <h3>Chưa chọn node nào</h3>
@@ -429,6 +455,7 @@ function Flow() {
             </div>
           )}
         </aside>
+        )}
       </div>
       <footer className="footer">Prototype thử cảm giác dùng — dữ liệu mẫu hư cấu, lưu cục bộ trong trình duyệt. Stack: React Flow (@xyflow/react) + Dagre auto-layout.</footer>
     </div>
