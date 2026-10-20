@@ -10,11 +10,20 @@ npm run dev
 # mở http://127.0.0.1:5178
 ```
 
+## Dữ liệu — giai đoạn 1 (đơn giản, sẽ mở rộng dần)
+
+Chỉ 3 loại thực thể:
+
+- **Công ty**: Công Ty Miền Tây (node trung tâm)
+- **Bộ môn (phòng ban)**: Ban Giám Đốc, Phòng Kinh Doanh, Phòng Kế Toán, Phòng Kỹ Thuật, Phòng Nhân Sự — trực thuộc công ty
+- **Nhân viên**: 11 người, mỗi người thuộc 1 bộ môn (ban đầu thu gọn trong bộ môn)
+
+Quan hệ: Bộ môn → trực thuộc → Công ty; Nhân viên → thuộc bộ môn → Bộ môn.
+
 ## Thử gì trong prototype này
 
-- Node là thực thể CRM thật (Công ty / Liên hệ / Deal / Ticket / Việc), mỗi loại 1 màu, node là card có trạng thái + giá trị.
-- Canvas là đồ thị quan hệ (không phải cây): 1 Deal nối được nhiều Contact, 1 Contact giới thiệu được Công ty khác, v.v.
-- Bấm nút ＋ trên node để mở nhánh đang thu gọn (mô phỏng lazy-load ego-graph theo hop).
+- Node là thực thể thật (Công ty / Bộ môn / Nhân viên), mỗi loại 1 màu, node là card có trạng thái + thông tin chính.
+- Bấm nút ＋ trên từng bộ môn để mở danh sách nhân viên đang thu gọn (mô phỏng lazy-load ego-graph theo hop).
 - Click node → sửa chi tiết ở panel phải (mẫu UX: canvas nhìn quan hệ, panel nhập liệu).
 - Kéo nối 2 node để tạo quan hệ, thêm/xóa node, lọc theo loại, tìm kiếm nhảy tới node.
 - "Sắp xếp lại" = auto-layout bằng Dagre; vị trí kéo tay được giữ nguyên cho tới khi bấm nút này.

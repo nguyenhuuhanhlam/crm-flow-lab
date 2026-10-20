@@ -54,7 +54,7 @@ function Flow() {
   const [collapsedIds, setCollapsedIds] = useState(() => new Set(initialNodesData.filter(n => n.collapsed).map(n => n.id)))
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState(() => Object.fromEntries(Object.keys(TYPE_META).map(k => [k, true])))
-  const [selectedId, setSelectedId] = useState('co-anphat')
+  const [selectedId, setSelectedId] = useState('co-mientay')
   // Theme: 'system' | 'light' | 'dark' — lưu lựa chọn vào localStorage
   const [themeMode, setThemeMode] = useState(() => localStorage.getItem('crm-theme') || 'system')
   const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -81,10 +81,10 @@ function Flow() {
   useEffect(() => {
     if (initDone.current) return
     initDone.current = true
-    const saved = (() => { try { return JSON.parse(localStorage.getItem('crm-node-proto') || 'null') } catch { return null } })()
+    const saved = (() => { try { return JSON.parse(localStorage.getItem('crm-node-proto-v2') || 'null') } catch { return null } })()
     const hidden = new Set(initialNodesData.filter(n => n.collapsed).map(n => n.id))
     let ns = initialNodesData.map(d => toFlowNode(d, hidden))
-    let es = initialEdgesData.map(e => ({ ...e, animated: e.label === 'phụ trách', style: { stroke: '#94a3b8' }, labelStyle: { fontSize: 11, fill: '#64748b' } }))
+    let es = initialEdgesData.map(e => ({ ...e, animated: false, style: { stroke: '#94a3b8' }, labelStyle: { fontSize: 11, fill: '#64748b' } }))
     if (saved?.nodes?.length) {
       const pos = Object.fromEntries(saved.nodes.map(n => [n.id, n.position]))
       ns = ns.map(n => pos[n.id] ? { ...n, position: pos[n.id] } : n)
@@ -177,10 +177,10 @@ function Flow() {
     const builtin = new Set(initialNodesData.map(n => n.id))
     const extraNodes = nodes.filter(n => !builtin.has(n.id))
     const extraEdges = edges.filter(e => !initialEdgesData.some(x => x.id === e.id))
-    localStorage.setItem('crm-node-proto', JSON.stringify({ nodes: nodes.map(n => ({ id: n.id, position: n.position })), extraNodes, extraEdges }))
+    localStorage.setItem('crm-node-proto-v2', JSON.stringify({ nodes: nodes.map(n => ({ id: n.id, position: n.position })), extraNodes, extraEdges }))
     alert('Đã lưu vị trí + node mới vào trình duyệt (localStorage). Tải lại trang sẽ khôi phục.')
   }
-  const reset = () => { localStorage.removeItem('crm-node-proto'); location.reload() }
+  const reset = () => { localStorage.removeItem('crm-node-proto-v2'); location.reload() }
 
   const doSearch = () => {
     const q = query.trim().toLowerCase(); if (!q) return
@@ -208,7 +208,7 @@ function Flow() {
               <option value="dark">Tối</option>
             </select>
           </label>
-          <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && doSearch()} placeholder="Tìm khách / deal / ticket…" />
+          <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && doSearch()} placeholder="Tìm bộ môn / nhân viên…" />
           <button onClick={doSearch}>Tìm</button>
           <button onClick={relayout}>Sắp xếp lại</button>
           <button onClick={collapseAll}>Thu gọn nhánh phụ</button>
@@ -249,7 +249,7 @@ function Flow() {
               <p>Click vào một node trên canvas để xem và sửa chi tiết tại đây. Đây là mẫu UX khuyến nghị cho CRM dạng graph: canvas để nhìn quan hệ, panel để nhập liệu — không nhồi form lên canvas.</p>
               <h4>Cách thử cảm giác dùng</h4>
               <ol>
-                <li>Bấm nút <b>＋</b> trên node Công Ty Miền Tây để mở nhánh Sao Mai / Minh Khang đang thu gọn.</li>
+                <li>Bấm nút <b>＋</b> trên từng bộ môn để mở danh sách nhân viên đang thu gọn.</li>
                 <li>Kéo thả node, cuộn để zoom, kéo nền để pan, xem MiniMap góc trái dưới.</li>
                 <li>Kéo nối 2 node để tạo quan hệ mới, chọn edge rồi nhấn Delete để xóa.</li>
                 <li>Thêm node mới, sửa tên/trạng thái/ghi chú ở panel này, bấm Lưu bố cục rồi tải lại trang.</li>
