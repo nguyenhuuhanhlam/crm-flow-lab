@@ -48,6 +48,22 @@ function CrmNode({ id, data, selected }) {
 }
 const nodeTypes = { crm: CrmNode }
 
+// Icon SVG nhỏ cho các nút ở topbar (chỉ icon cho gọn, nhãn nằm trong tooltip)
+const ICONS = {
+  search: (<><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></>),
+  layout: (<><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>),
+  collapse: (<><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" /></>),
+  save: (<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></>),
+  reset: (<><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></>),
+}
+function IconBtn({ icon, label, onClick }) {
+  return (
+    <button className="icon-btn" onClick={onClick} title={label} aria-label={label}>
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{ICONS[icon]}</svg>
+    </button>
+  )
+}
+
 let seq = 100
 function Flow() {
   const rf = useReactFlow()
@@ -209,11 +225,11 @@ function Flow() {
             </select>
           </label>
           <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && doSearch()} placeholder="Tìm bộ môn / nhân viên…" />
-          <button onClick={doSearch}>Tìm</button>
-          <button onClick={relayout}>Sắp xếp lại</button>
-          <button onClick={collapseAll}>Thu gọn nhánh phụ</button>
-          <button onClick={save}>Lưu bố cục</button>
-          <button onClick={reset}>Đặt lại mẫu</button>
+          <IconBtn icon="search" label="Tìm" onClick={doSearch} />
+          <IconBtn icon="layout" label="Sắp xếp lại" onClick={relayout} />
+          <IconBtn icon="collapse" label="Thu gọn nhánh phụ" onClick={collapseAll} />
+          <IconBtn icon="save" label="Lưu bố cục" onClick={save} />
+          <IconBtn icon="reset" label="Đặt lại mẫu" onClick={reset} />
         </div>
       </header>
 
