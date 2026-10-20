@@ -25,12 +25,13 @@ function layout(nodes, edges, direction = 'LR') {
 // ---------- Custom node dạng card CRM ----------
 function CrmNode({ id, data, selected }) {
   const meta = TYPE_META[data.type]
+  const accent = data.dark ? meta.darkColor : meta.color
   return (
-    <div className={`crm-node ${selected ? 'selected' : ''}`} style={{ background: meta.bg, borderColor: selected ? meta.color : meta.border }}>
+    <div className={`crm-node ${selected ? 'selected' : ''}`} style={{ background: data.dark ? meta.darkBg : meta.bg, borderColor: selected ? accent : (data.dark ? meta.darkBorder : meta.border) }}>
       <Handle type="target" position={Position.Left} />
       <div className="crm-node-head">
         <span className="crm-node-icon">{meta.icon}</span>
-        <span className="crm-node-type" style={{ color: meta.color }}>{meta.label}</span>
+        <span className="crm-node-type" style={{ color: accent }}>{meta.label}</span>
         {data.hasHidden ? (
           <button className="expand-btn nodrag" title="Mở / thu nhánh liên quan" onClick={(e) => { e.stopPropagation(); data.onExpand(id) }}>＋</button>
         ) : null}
@@ -38,7 +39,7 @@ function CrmNode({ id, data, selected }) {
       <div className="crm-node-title">{data.title}</div>
       <div className="crm-node-sub">{data.subtitle}</div>
       <div className="crm-node-foot">
-        <span className="badge" style={{ color: meta.color, borderColor: meta.border }}>{data.status}</span>
+        <span className="badge" style={{ color: accent, borderColor: data.dark ? meta.darkBorder : meta.border }}>{data.status}</span>
         <span className="crm-node-value">{data.value}</span>
       </div>
       <Handle type="source" position={Position.Right} />
@@ -54,6 +55,17 @@ function Flow() {
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState(() => Object.fromEntries(Object.keys(TYPE_META).map(k => [k, true])))
   const [selectedId, setSelectedId] = useState('co-anphat')
+  // Theme: 'system' | 'light' | 'dark' — lưu lựa chọn vào localStorage
+  const [themeMode, setThemeMode] = useState(() => localStorage.getItem('crm-theme') || 'system')
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = (e) => setSystemDark(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  useEffect(() => { localStorage.setItem('crm-theme', themeMode) }, [themeMode])
+  const dark = themeMode === 'dark' || (themeMode === 'system' && systemDark)
 
   const toFlowNode = useCallback((d, hiddenIds) => ({
     id: d.id, type: 'crm', position: { x: 0, y: 0 },
@@ -91,9 +103,9 @@ function Flow() {
   // Gắn cờ hasHidden + handler expand vào data của từng node
   const decorated = useMemo(() => nodes.map(n => {
     const neighbourHidden = edges.some(e => ((e.source === n.id && collapsedIds.has(e.target)) || (e.target === n.id && collapsedIds.has(e.source))))
-    return { ...n, data: { ...n.data, hasHidden: neighbourHidden, onExpand: (id) => expandFrom(id) } }
+    return { ...n, data: { ...n.data, dark, hasHidden: neighbourHidden, onExpand: (id) => expandFrom(id) } }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [nodes, edges, collapsedIds])
+  }), [nodes, edges, collapsedIds, dark])
 
   function expandFrom(id) {
     const next = new Set(collapsedIds)
@@ -123,7 +135,7 @@ function Flow() {
   const visibleEdges = useMemo(() => edges.filter(e => {
     const s = decorated.find(n => n.id === e.source), t = decorated.find(n => n.id === e.target)
     return s && t && typeFilter[s.data.type] !== false && typeFilter[t.data.type] !== false && !s.hidden && !t.hidden
-  }), [edges, decorated, typeFilter])
+  }).map(e => ({ ...e, labelStyle: { fontSize: 11, fill: dark ? '#cbd5e1' : '#64748b' } })), [edges, decorated, typeFilter, dark])
 
   const selected = nodes.find(n => n.id === selectedId)
 
@@ -182,13 +194,20 @@ function Flow() {
   }, [nodes])
 
   return (
-    <div className="app">
+    <div className={`app ${dark ? 'dark' : ''}`}>
       <header className="topbar">
         <div>
           <h1>CRM dạng Node — Prototype</h1>
           <p>Kéo thả node • Kéo từ chấm bên phải node này sang chấm bên trái node khác để nối quan hệ • Click node để sửa ở panel phải</p>
         </div>
         <div className="top-actions">
+          <label className="theme-select">Theme
+            <select value={themeMode} onChange={e => setThemeMode(e.target.value)} title="Chọn giao diện sáng / tối">
+              <option value="system">Theo hệ thống</option>
+              <option value="light">Sáng</option>
+              <option value="dark">Tối</option>
+            </select>
+          </label>
           <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && doSearch()} placeholder="Tìm khách / deal / ticket…" />
           <button onClick={doSearch}>Tìm</button>
           <button onClick={relayout}>Sắp xếp lại</button>
@@ -215,6 +234,7 @@ function Flow() {
             onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
             onNodeClick={(_, n) => setSelectedId(n.id)} onPaneClick={() => setSelectedId(null)}
             nodeTypes={nodeTypes} fitView minZoom={0.2} maxZoom={1.8}
+            colorMode={dark ? 'dark' : 'light'}
           >
             <Background gap={18} size={1} />
             <Controls />

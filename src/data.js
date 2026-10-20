@@ -3,11 +3,11 @@
 // edges đến từ 1 bảng relations riêng. Ở prototype này dữ liệu đóng cứng để thử cảm giác dùng.
 
 export const TYPE_META = {
-  company: { label: 'Công ty', icon: '🏢', color: '#2563eb', bg: '#eff6ff', border: '#93c5fd' },
-  contact: { label: 'Liên hệ', icon: '👤', color: '#059669', bg: '#ecfdf5', border: '#6ee7b7' },
-  deal:    { label: 'Deal',    icon: '💰', color: '#d97706', bg: '#fffbeb', border: '#fcd34d' },
-  ticket:  { label: 'Ticket',  icon: '🎫', color: '#dc2626', bg: '#fef2f2', border: '#fca5a5' },
-  task:    { label: 'Việc',    icon: '✅', color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd' },
+  company: { label: 'Công ty', icon: '🏢', color: '#2563eb', bg: '#eff6ff', border: '#93c5fd', darkColor: '#60a5fa', darkBg: '#172554', darkBorder: '#1d4ed8' },
+  contact: { label: 'Liên hệ', icon: '👤', color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', darkColor: '#34d399', darkBg: '#022c22', darkBorder: '#047857' },
+  deal:    { label: 'Deal',    icon: '💰', color: '#d97706', bg: '#fffbeb', border: '#fcd34d', darkColor: '#fbbf24', darkBg: '#451a03', darkBorder: '#b45309' },
+  ticket:  { label: 'Ticket',  icon: '🎫', color: '#dc2626', bg: '#fef2f2', border: '#fca5a5', darkColor: '#f87171', darkBg: '#450a0a', darkBorder: '#b91c1c' },
+  task:    { label: 'Việc',    icon: '✅', color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd', darkColor: '#a78bfa', darkBg: '#2e1065', darkBorder: '#6d28d9' },
 }
 
 export const initialNodesData = [
