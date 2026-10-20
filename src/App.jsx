@@ -133,9 +133,29 @@ function Flow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Trạng thái Xem riêng — khai báo sớm vì decorated dùng tới
+  // Trạng thái Xem riêng — PHẢI khai báo trước mọi useMemo dùng tới (decorated, visibleNodes...)
   const [focusId, setFocusId] = useState(null)
   const focusBackup = useRef(null)
+
+  // Tập node khi Xem riêng: node + quan hệ trực tiếp + chuỗi cấp trên (đi ngược quan hệ chính)
+  const computeFocusSet = useCallback((id) => {
+    const s = new Set([id])
+    edges.forEach(e => { if (e.source === id) s.add(e.target); if (e.target === id) s.add(e.source) })
+    let cur = id
+    const chainSeen = new Set([id])
+    while (cur) {
+      const up = edges.find(e => e.source === cur && !e.secondary)
+      if (!up) break
+      const parent = up.target
+      if (parent === cur || chainSeen.has(parent)) break
+      chainSeen.add(parent); s.add(parent)
+      if (parent === 'co-mientay') break
+      cur = parent
+    }
+    return s
+  }, [edges])
+
+  const focusSet = useMemo(() => (focusId ? computeFocusSet(focusId) : null), [focusId, computeFocusSet])
 
   // Gắn cờ hasHidden / canCollapse + handler gạt mở-thu vào data của từng node
   const decorated = useMemo(() => nodes.map(n => {
@@ -228,27 +248,6 @@ function Flow() {
   const [panelW, setPanelW] = useState(() => { try { return JSON.parse(localStorage.getItem('crm-panel') || '{}').w || 330 } catch { return 330 } })
   const [panelCollapsed, setPanelCollapsed] = useState(() => { try { return !!JSON.parse(localStorage.getItem('crm-panel') || '{}').collapsed } catch { return false } })
   useEffect(() => { localStorage.setItem('crm-panel', JSON.stringify({ w: panelW, collapsed: panelCollapsed })) }, [panelW, panelCollapsed])
-
-  // ----- Chế độ Xem riêng (focus): chỉ hiện 1 node + quan hệ trực tiếp + chuỗi cấp trên -----
-  const computeFocusSet = useCallback((id) => {
-    const s = new Set([id])
-    edges.forEach(e => { if (e.source === id) s.add(e.target); if (e.target === id) s.add(e.source) })
-    // chuỗi cấp trên: đi ngược quan hệ chính (bỏ qua quan hệ kiêm nhiệm)
-    let cur = id
-    const chainSeen = new Set([id])
-    while (cur) {
-      const up = edges.find(e => e.source === cur && !e.secondary)
-      if (!up) break
-      const parent = up.target
-      if (parent === cur || chainSeen.has(parent)) break
-      chainSeen.add(parent); s.add(parent)
-      if (parent === 'co-mientay') break
-      cur = parent
-    }
-    return s
-  }, [edges])
-
-  const focusSet = useMemo(() => (focusId ? computeFocusSet(focusId) : null), [focusId, computeFocusSet])
 
   function enterFocus(id) {
     if (!focusId) {
