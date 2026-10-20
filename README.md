@@ -15,7 +15,7 @@ npm run dev
 Chỉ 3 loại thực thể:
 
 - **Công ty**: Công Ty Miền Tây (node trung tâm)
-- **Bộ môn (phòng ban)**: Ban Giám Đốc, Phòng Kinh Doanh, Phòng Kế Toán, Phòng Kỹ Thuật, Phòng Nhân Sự — trực thuộc công ty
+- **Bộ môn (phòng ban)**: Ban Giám Đốc, Bộ môn Bê tông & Xi măng, Bộ môn Cơ học Đất, Bộ môn Thép & Vật liệu xây, Bộ môn Hiện trường & Kiểm định — trực thuộc công ty
 - **Nhân viên**: 11 người, mỗi người thuộc 1 bộ môn (ban đầu thu gọn trong bộ môn)
 
 Quan hệ: Bộ môn → trực thuộc → Công ty; Nhân viên → thuộc bộ môn → Bộ môn.
