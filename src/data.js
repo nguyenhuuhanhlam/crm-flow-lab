@@ -18,13 +18,13 @@ export const initialNodesData = [
   { id: 'dept-betong', type: 'department', title: 'Bộ môn Bê tông & Xi măng', subtitle: 'Bộ môn trực thuộc công ty', status: 'Đang hoạt động', value: '3 nhân viên', note: 'Thí nghiệm cường độ bê tông, xi măng, cốt liệu.' },
   { id: 'dept-dat', type: 'department', title: 'Bộ môn Cơ học Đất', subtitle: 'Bộ môn trực thuộc công ty', status: 'Đang hoạt động', value: '2 nhân viên', note: 'Thí nghiệm cơ lý đất, đầm chặt, CBR, nền móng.' },
   { id: 'dept-thep', type: 'department', title: 'Bộ môn Thép & Vật liệu xây', subtitle: 'Bộ môn trực thuộc công ty', status: 'Đang hoạt động', value: '2 nhân viên', note: 'Thí nghiệm thép, gạch, đá và vật liệu hoàn thiện.' },
-  { id: 'dept-hientruong', type: 'department', title: 'Bộ môn Hiện trường & Kiểm định', subtitle: 'Bộ môn trực thuộc công ty', status: 'Đang hoạt động', value: '2 nhân viên', note: 'Thí nghiệm hiện trường, siêu âm bê tông, kiểm định kết cấu công trình.' },
+  { id: 'dept-hientruong', type: 'department', title: 'Bộ môn Hiện trường & Kiểm định', subtitle: 'Bộ môn trực thuộc công ty', status: 'Đang hoạt động', value: '2 nhân viên • 1 kiêm nhiệm', note: 'Thí nghiệm hiện trường, siêu âm bê tông, kiểm định kết cấu công trình.' },
 
   // Nhân viên — ban đầu thu gọn theo bộ môn, bấm + trên bộ môn để mở
   { id: 'emp-an', type: 'employee', title: 'Nguyễn Văn An', subtitle: 'Giám đốc', status: 'Đang làm việc', value: 'an@mientay.example', note: 'Người điều hành cao nhất.', collapsed: true },
   { id: 'emp-binh', type: 'employee', title: 'Trần Thị Bình', subtitle: 'Phó giám đốc', status: 'Đang làm việc', value: 'binh@mientay.example', note: 'Phụ trách vận hành hằng ngày.', collapsed: true },
   { id: 'emp-cuong', type: 'employee', title: 'Lê Văn Cường', subtitle: 'Trưởng bộ môn Bê tông & Xi măng', status: 'Đang làm việc', value: 'cuong@mientay.example', note: 'Quản lý bộ môn bê tông & xi măng.', collapsed: true },
-  { id: 'emp-dung', type: 'employee', title: 'Phạm Quốc Dũng', subtitle: 'Thí nghiệm viên', status: 'Đang làm việc', value: 'dung@mientay.example', note: '', collapsed: true },
+  { id: 'emp-dung', type: 'employee', title: 'Phạm Quốc Dũng', subtitle: 'Thí nghiệm viên', status: 'Đang làm việc', value: 'dung@mientay.example', note: 'Nhân viên mẫu KIÊM NHIỆM: chính tại Bộ môn Bê tông & Xi măng, kiêm thêm Bộ môn Hiện trường & Kiểm định (đường nét đứt).', concurrent: 'Hiện trường & Kiểm định', collapsed: true },
   { id: 'emp-ha', type: 'employee', title: 'Nguyễn Thu Hà', subtitle: 'Thí nghiệm viên', status: 'Đang làm việc', value: 'ha@mientay.example', note: '', collapsed: true },
   { id: 'emp-khoa', type: 'employee', title: 'Võ Minh Khoa', subtitle: 'Trưởng bộ môn Cơ học Đất', status: 'Đang làm việc', value: 'khoa@mientay.example', note: '', collapsed: true },
   { id: 'emp-lan', type: 'employee', title: 'Đặng Ngọc Lan', subtitle: 'Thí nghiệm viên', status: 'Đang làm việc', value: 'lan@mientay.example', note: '', collapsed: true },
@@ -51,4 +51,6 @@ export const initialEdgesData = [
   { id: 'e14', source: 'emp-nam', target: 'dept-thep', label: 'thuộc bộ môn' },
   { id: 'e15', source: 'emp-oanh', target: 'dept-hientruong', label: 'thuộc bộ môn' },
   { id: 'e16', source: 'emp-phuc', target: 'dept-hientruong', label: 'thuộc bộ môn' },
+  // Quan hệ KIÊM NHIỆM (phụ) — vẽ nét đứt, không tham gia thu/mở nhánh chính
+  { id: 'e17', source: 'emp-dung', target: 'dept-hientruong', label: 'kiêm nhiệm', secondary: true },
 ]

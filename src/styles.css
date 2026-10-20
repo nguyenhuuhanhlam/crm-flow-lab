@@ -29,6 +29,8 @@ button.danger { color: #b91c1c; border-color: #fca5a5; width: 100%; margin-top: 
 .crm-node.selected { box-shadow: 0 0 0 3px rgba(37,99,235,.25), 0 4px 14px rgba(15,23,42,.15); }
 .crm-node-head { display: flex; align-items: center; gap: 6px; }
 .crm-node-icon { font-size: 15px; }
+.badge-concurrent { font-size: 10px; font-weight: 700; color: #92400e; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.app.dark .badge-concurrent { color: #fbbf24; background: #451a03; border-color: #b45309; }
 .crm-node-type { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .expand-btn { margin-left: auto; width: 22px; height: 22px; padding: 0; border-radius: 999px; line-height: 1; font-size: 14px; background: #0f172a; color: #fff; border: none; }
 .crm-node-title { font-size: 14px; font-weight: 700; margin-top: 5px; line-height: 1.3; }

@@ -20,6 +20,8 @@ Chỉ 3 loại thực thể:
 
 Quan hệ: Bộ môn → trực thuộc → Công ty; Nhân viên → thuộc bộ môn → Bộ môn.
 
+Kiêm nhiệm: nhân viên vẫn là 1 node duy nhất — thêm 1 quan hệ phụ (nét đứt cam, nhãn 'kiêm nhiệm') sang bộ môn kiêm nhiệm, kèm badge 'kiêm nhiệm' trên card. Mẫu: Phạm Quốc Dũng (chính: Bê tông & Xi măng) kiêm Bộ môn Hiện trường & Kiểm định. Thu/mở nhánh chỉ đi theo quan hệ chính.
+
 ## Thử gì trong prototype này
 
 - Node là thực thể thật (Công ty / Bộ môn / Nhân viên), mỗi loại 1 màu, node là card có trạng thái + thông tin chính.

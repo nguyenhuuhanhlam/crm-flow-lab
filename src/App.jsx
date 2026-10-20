@@ -27,7 +27,7 @@ function layout(nodes, edges, direction = 'LR') {
 const LEVELS = (() => {
   const lvl = { 'co-mientay': 0 }
   const adj = {}
-  initialEdgesData.forEach(e => { (adj[e.source] ||= []).push(e.target); (adj[e.target] ||= []).push(e.source) })
+  initialEdgesData.filter(e => !e.secondary).forEach(e => { (adj[e.source] ||= []).push(e.target); (adj[e.target] ||= []).push(e.source) })
   const queue = ['co-mientay']
   while (queue.length) {
     const cur = queue.shift()
@@ -46,6 +46,7 @@ function CrmNode({ id, data, selected }) {
       <div className="crm-node-head">
         <span className="crm-node-icon">{meta.icon}</span>
         <span className="crm-node-type" style={{ color: accent }}>{meta.label}</span>
+        {data.concurrent ? <span className="badge-concurrent" title={`Kiêm nhiệm: ${data.concurrent}`}>kiêm nhiệm</span> : null}
         {(data.hasHidden || data.canCollapse) ? (
           <button className="expand-btn nodrag" title={data.hasHidden ? 'Mở nhánh tại node này' : 'Thu gọn nhánh tại node này'} onClick={(e) => { e.stopPropagation(); data.onToggle(id) }}>{data.hasHidden ? '＋' : '−'}</button>
         ) : null}
@@ -111,10 +112,10 @@ function Flow() {
   useEffect(() => {
     if (initDone.current) return
     initDone.current = true
-    const saved = (() => { try { return JSON.parse(localStorage.getItem('crm-node-proto-v3') || 'null') } catch { return null } })()
+    const saved = (() => { try { return JSON.parse(localStorage.getItem('crm-node-proto-v4') || 'null') } catch { return null } })()
     const hidden = new Set(initialNodesData.filter(n => n.collapsed).map(n => n.id))
     let ns = initialNodesData.map(d => toFlowNode(d, hidden))
-    let es = initialEdgesData.map(e => ({ ...e, animated: false, style: { stroke: '#94a3b8' }, labelStyle: { fontSize: 11, fill: '#64748b' } }))
+    let es = initialEdgesData.map(e => ({ ...e, animated: false, style: e.secondary ? { stroke: '#d97706', strokeWidth: 2, strokeDasharray: '7 5' } : { stroke: '#94a3b8' }, labelStyle: { fontSize: 11, fill: e.secondary ? '#d97706' : '#64748b', fontWeight: e.secondary ? 700 : 400 } }))
     if (saved?.nodes?.length) {
       const pos = Object.fromEntries(saved.nodes.map(n => [n.id, n.position]))
       ns = ns.map(n => pos[n.id] ? { ...n, position: pos[n.id] } : n)
@@ -138,6 +139,7 @@ function Flow() {
       const other = e.source === n.id ? e.target : e.target === n.id ? e.source : null
       if (!other) return
       if (collapsedIds.has(other)) neighbourHidden = true
+      if (e.secondary) return // quan hệ kiêm nhiệm không quyết định thu/mở nhánh
       const otherNode = nodes.find(x => x.id === other)
       if (otherNode && !collapsedIds.has(other) && (otherNode.data.level ?? 1) > myLevel) canCollapse = true
     })
@@ -174,6 +176,7 @@ function Flow() {
     while (queue.length) {
       const cur = queue.shift()
       edges.forEach(e => {
+        if (e.secondary) return // chỉ thu theo quan hệ chính, đường kiêm nhiệm là nối chéo tham khảo
         const other = e.source === cur ? e.target : e.target === cur ? e.source : null
         if (!other || visited.has(other)) return
         visited.add(other)
@@ -230,10 +233,12 @@ function Flow() {
         ['Trưởng bộ môn', lead?.data.title || 'Chưa phân công'], ['Số nhân viên', String(members.length)], ['Chức năng', d.note || '—'],
       ]
     }
-    return [
-      ['Mã nhân viên', `NV-${code}`], ['Chức vụ', d.subtitle], ['Thuộc bộ môn', parentOf(n.id)?.data.title || '—'],
+    const rows = [
+      ['Mã nhân viên', `NV-${code}`], ['Chức vụ', d.subtitle], ['Thuộc bộ môn (chính)', parentOf(n.id)?.data.title || '—'],
       ['Email', d.value || '—'], ['Điện thoại', '0900 000 000 (mẫu)'], ['Ngày vào làm', '04-01-2021 (mẫu)'], ['Trạng thái', d.status],
     ]
+    if (d.concurrent) rows.splice(3, 0, ['Kiêm nhiệm', `Bộ môn ${d.concurrent} — vai trò: Thí nghiệm viên hiện trường, từ 01-09-2026 (mẫu)`])
+    return rows
   }
 
   function activityRows(n) {
@@ -288,10 +293,10 @@ function Flow() {
     const builtin = new Set(initialNodesData.map(n => n.id))
     const extraNodes = nodes.filter(n => !builtin.has(n.id))
     const extraEdges = edges.filter(e => !initialEdgesData.some(x => x.id === e.id))
-    localStorage.setItem('crm-node-proto-v3', JSON.stringify({ nodes: nodes.map(n => ({ id: n.id, position: n.position })), extraNodes, extraEdges }))
+    localStorage.setItem('crm-node-proto-v4', JSON.stringify({ nodes: nodes.map(n => ({ id: n.id, position: n.position })), extraNodes, extraEdges }))
     alert('Đã lưu vị trí + node mới vào trình duyệt (localStorage). Tải lại trang sẽ khôi phục.')
   }
-  const reset = () => { localStorage.removeItem('crm-node-proto-v3'); location.reload() }
+  const reset = () => { localStorage.removeItem('crm-node-proto-v4'); location.reload() }
 
   const doSearch = () => {
     const q = query.trim().toLowerCase(); if (!q) return
