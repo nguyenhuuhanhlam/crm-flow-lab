@@ -207,6 +207,49 @@ function Flow() {
 
   const selected = nodes.find(n => n.id === selectedId)
 
+  // ----- Panel phải dạng tabs: Tổng quan / Chi tiết / Hoạt động / Tài liệu -----
+  const [panelTab, setPanelTab] = useState('tongquan')
+  useEffect(() => { setPanelTab('tongquan') }, [selectedId])
+
+  const childrenOf = (id) => edges.filter(e => e.target === id).map(e => nodes.find(n => n.id === e.source)).filter(Boolean)
+  const parentOf = (id) => { const e = edges.find(x => x.source === id); return e ? nodes.find(n => n.id === e.target) : null }
+
+  function detailRows(n) {
+    const d = n.data
+    const code = n.id.replace(/^(co|dept|emp)-/, '').toUpperCase()
+    if (d.type === 'company') return [
+      ['Mã số thuế', '1801234567 (mẫu)'], ['Lĩnh vực', d.subtitle], ['Trụ sở', 'TP. Cần Thơ (mẫu)'],
+      ['Điện thoại', '0292 000 000 (mẫu)'], ['Email', 'info@mientay.example'], ['Website', 'mientay.example'],
+      ['Ngày thành lập', '15-03-2012 (mẫu)'], ['Số bộ môn', String(childrenOf(n.id).length)], ['Tổng nhân viên', String(nodes.filter(x => x.data.type === 'employee').length)],
+    ]
+    if (d.type === 'department') {
+      const members = childrenOf(n.id)
+      const lead = members.find(m => /Trưởng|Giám đốc/.test(m.data.subtitle))
+      return [
+        ['Mã bộ môn', `BM-${code}`], ['Trực thuộc', parentOf(n.id)?.data.title || '—'],
+        ['Trưởng bộ môn', lead?.data.title || 'Chưa phân công'], ['Số nhân viên', String(members.length)], ['Chức năng', d.note || '—'],
+      ]
+    }
+    return [
+      ['Mã nhân viên', `NV-${code}`], ['Chức vụ', d.subtitle], ['Thuộc bộ môn', parentOf(n.id)?.data.title || '—'],
+      ['Email', d.value || '—'], ['Điện thoại', '0900 000 000 (mẫu)'], ['Ngày vào làm', '04-01-2021 (mẫu)'], ['Trạng thái', d.status],
+    ]
+  }
+
+  function activityRows(n) {
+    const t = n.data.type
+    if (t === 'company') return [['18-10-2026', 'Cập nhật thông tin công ty'], ['02-10-2026', 'Hoàn thành hiệu chuẩn định kỳ thiết bị thí nghiệm'], ['15-09-2026', 'Ký hợp đồng thí nghiệm vật liệu mới']]
+    if (t === 'department') return [['17-10-2026', 'Tiếp nhận đợt mẫu thí nghiệm mới'], ['08-10-2026', 'Hoàn thành báo cáo thí nghiệm kỳ trước'], ['28-09-2026', 'Bảo trì thiết bị trong bộ môn']]
+    return [['16-10-2026', 'Cập nhật hồ sơ cá nhân'], ['05-10-2026', 'Hoàn thành nhiệm vụ thí nghiệm được giao'], ['20-09-2026', 'Tham gia đào tạo an toàn phòng thí nghiệm']]
+  }
+
+  function docRows(n) {
+    const t = n.data.type
+    if (t === 'company') return [['Giấy chứng nhận đăng ký doanh nghiệp.pdf', 'PDF • 1,2 MB • 10-01-2024'], ['Quyết định công nhận phòng thí nghiệm LAS-XD.pdf', 'PDF • 860 KB • 22-05-2024'], ['Hồ sơ năng lực công ty.pdf', 'PDF • 4,5 MB • 03-02-2026']]
+    if (t === 'department') return [['Quy trình thí nghiệm của bộ môn.pdf', 'PDF • 2,1 MB • 14-03-2025'], ['Danh mục thiết bị thí nghiệm.xlsx', 'Excel • 320 KB • 30-08-2026'], ['Sổ tay chất lượng bộ môn.pdf', 'PDF • 1,7 MB • 12-01-2026']]
+    return [['Hồ sơ nhân viên.pdf', 'PDF • 940 KB • 04-01-2021'], ['Chứng chỉ thí nghiệm viên.pdf', 'PDF • 410 KB • 18-06-2023'], ['Hợp đồng lao động.pdf', 'PDF • 620 KB • 04-01-2021']]
+  }
+
   const onConnect = useCallback((params) => setEdges(es => addEdge({ ...params, label: 'liên quan', style: { stroke: '#94a3b8' } }, es)), [setEdges])
 
   const updateSelected = (patch) => {
@@ -326,21 +369,58 @@ function Flow() {
           ) : (
             <div>
               <div className="panel-type" style={{ color: TYPE_META[selected.data.type].color }}>{TYPE_META[selected.data.type].icon} {TYPE_META[selected.data.type].label}</div>
-              <label>Tên / Tiêu đề<input value={selected.data.title} onChange={e => updateSelected({ title: e.target.value })} /></label>
-              <label>Dòng phụ<input value={selected.data.subtitle} onChange={e => updateSelected({ subtitle: e.target.value })} /></label>
-              <label>Trạng thái<input value={selected.data.status} onChange={e => updateSelected({ status: e.target.value })} /></label>
-              <label>Giá trị / Thông tin chính<input value={selected.data.value} onChange={e => updateSelected({ value: e.target.value })} /></label>
-              <label>Ghi chú<textarea rows={5} value={selected.data.note} onChange={e => updateSelected({ note: e.target.value })} /></label>
-              <div className="panel-rel">
-                <h4>Quan hệ của node này</h4>
-                {edges.filter(e => e.source === selected.id || e.target === selected.id).map(e => {
-                  const otherId = e.source === selected.id ? e.target : e.source
-                  const other = nodes.find(n => n.id === otherId)
-                  return <button key={e.id} className="rel-item" onClick={() => other && setSelectedId(other.id)}>{e.label || 'liên quan'} → {other?.data.title || otherId}</button>
-                })}
-                {edges.every(e => e.source !== selected.id && e.target !== selected.id) && <p className="muted">Chưa có quan hệ nào.</p>}
+              <div className="tabs" role="tablist">
+                {[['tongquan', 'Tổng quan'], ['chitiet', 'Chi tiết'], ['hoatdong', 'Hoạt động'], ['tailieu', 'Tài liệu']].map(([k, label]) => (
+                  <button key={k} role="tab" aria-selected={panelTab === k} className={`tab-btn ${panelTab === k ? 'active' : ''}`} onClick={() => setPanelTab(k)}>{label}</button>
+                ))}
               </div>
-              <button className="danger" onClick={deleteSelected}>Xóa node này</button>
+
+              {panelTab === 'tongquan' && (
+                <div>
+                  <label>Tên / Tiêu đề<input value={selected.data.title} onChange={e => updateSelected({ title: e.target.value })} /></label>
+                  <label>Dòng phụ<input value={selected.data.subtitle} onChange={e => updateSelected({ subtitle: e.target.value })} /></label>
+                  <label>Trạng thái<input value={selected.data.status} onChange={e => updateSelected({ status: e.target.value })} /></label>
+                  <label>Giá trị / Thông tin chính<input value={selected.data.value} onChange={e => updateSelected({ value: e.target.value })} /></label>
+                  <label>Ghi chú<textarea rows={5} value={selected.data.note} onChange={e => updateSelected({ note: e.target.value })} /></label>
+                  <div className="panel-rel">
+                    <h4>Quan hệ của node này</h4>
+                    {edges.filter(e => e.source === selected.id || e.target === selected.id).map(e => {
+                      const otherId = e.source === selected.id ? e.target : e.source
+                      const other = nodes.find(n => n.id === otherId)
+                      return <button key={e.id} className="rel-item" onClick={() => other && setSelectedId(other.id)}>{e.label || 'liên quan'} → {other?.data.title || otherId}</button>
+                    })}
+                    {edges.every(e => e.source !== selected.id && e.target !== selected.id) && <p className="muted">Chưa có quan hệ nào.</p>}
+                  </div>
+                  <button className="danger" onClick={deleteSelected}>Xóa node này</button>
+                </div>
+              )}
+
+              {panelTab === 'chitiet' && (
+                <dl className="detail-list">
+                  {detailRows(selected).map(([k, v]) => (
+                    <div key={k} className="detail-row"><dt>{k}</dt><dd>{v}</dd></div>
+                  ))}
+                  <p className="muted">Thuộc tính mở rộng theo loại node — dữ liệu đánh dấu (mẫu) là minh họa, sẽ nối API thật sau.</p>
+                </dl>
+              )}
+
+              {panelTab === 'hoatdong' && (
+                <div className="activity-list">
+                  {activityRows(selected).map(([date, text]) => (
+                    <div key={date + text} className="activity-row"><span className="activity-date">{date}</span><span>{text}</span></div>
+                  ))}
+                  <p className="muted">Dòng thời gian hoạt động liên quan đến node này (dữ liệu mẫu).</p>
+                </div>
+              )}
+
+              {panelTab === 'tailieu' && (
+                <div className="doc-list">
+                  {docRows(selected).map(([name, meta]) => (
+                    <div key={name} className="doc-row"><span className="doc-icon">📄</span><span className="doc-main"><span className="doc-name">{name}</span><span className="doc-meta">{meta}</span></span><button onClick={() => alert('Tài liệu mẫu — chưa nối kho file thật.')}>Tải</button></div>
+                  ))}
+                  <p className="muted">Tài liệu đính kèm theo node (dữ liệu mẫu).</p>
+                </div>
+              )}
             </div>
           )}
         </aside>
