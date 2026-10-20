@@ -22,6 +22,20 @@ function layout(nodes, edges, direction = 'LR') {
   })
 }
 
+// Cấp bậc theo khoảng cách từ node gốc (công ty): gốc 0, bộ môn 1, nhân viên 2.
+// Dùng để biết node nào là "nhánh dưới" của node nào khi thu gọn tại 1 node.
+const LEVELS = (() => {
+  const lvl = { 'co-mientay': 0 }
+  const adj = {}
+  initialEdgesData.forEach(e => { (adj[e.source] ||= []).push(e.target); (adj[e.target] ||= []).push(e.source) })
+  const queue = ['co-mientay']
+  while (queue.length) {
+    const cur = queue.shift()
+    for (const nb of adj[cur] || []) if (!(nb in lvl)) { lvl[nb] = lvl[cur] + 1; queue.push(nb) }
+  }
+  return lvl
+})()
+
 // ---------- Custom node dạng card CRM ----------
 function CrmNode({ id, data, selected }) {
   const meta = TYPE_META[data.type]
@@ -32,8 +46,8 @@ function CrmNode({ id, data, selected }) {
       <div className="crm-node-head">
         <span className="crm-node-icon">{meta.icon}</span>
         <span className="crm-node-type" style={{ color: accent }}>{meta.label}</span>
-        {data.hasHidden ? (
-          <button className="expand-btn nodrag" title="Mở / thu nhánh liên quan" onClick={(e) => { e.stopPropagation(); data.onExpand(id) }}>＋</button>
+        {(data.hasHidden || data.canCollapse) ? (
+          <button className="expand-btn nodrag" title={data.hasHidden ? 'Mở nhánh tại node này' : 'Thu gọn nhánh tại node này'} onClick={(e) => { e.stopPropagation(); data.onToggle(id) }}>{data.hasHidden ? '＋' : '−'}</button>
         ) : null}
       </div>
       <div className="crm-node-title">{data.title}</div>
@@ -86,7 +100,7 @@ function Flow() {
   const toFlowNode = useCallback((d, hiddenIds) => ({
     id: d.id, type: 'crm', position: { x: 0, y: 0 },
     hidden: hiddenIds.has(d.id),
-    data: { ...d },
+    data: { ...d, level: LEVELS[d.id] ?? 1 },
   }), [])
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
@@ -116,10 +130,18 @@ function Flow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Gắn cờ hasHidden + handler expand vào data của từng node
+  // Gắn cờ hasHidden / canCollapse + handler gạt mở-thu vào data của từng node
   const decorated = useMemo(() => nodes.map(n => {
-    const neighbourHidden = edges.some(e => ((e.source === n.id && collapsedIds.has(e.target)) || (e.target === n.id && collapsedIds.has(e.source))))
-    return { ...n, data: { ...n.data, dark, hasHidden: neighbourHidden, onExpand: (id) => expandFrom(id) } }
+    const myLevel = n.data.level ?? 1
+    let neighbourHidden = false, canCollapse = false
+    edges.forEach(e => {
+      const other = e.source === n.id ? e.target : e.target === n.id ? e.source : null
+      if (!other) return
+      if (collapsedIds.has(other)) neighbourHidden = true
+      const otherNode = nodes.find(x => x.id === other)
+      if (otherNode && !collapsedIds.has(other) && (otherNode.data.level ?? 1) > myLevel) canCollapse = true
+    })
+    return { ...n, data: { ...n.data, dark, hasHidden: neighbourHidden, canCollapse, onToggle: (id) => toggleNode(id) } }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [nodes, edges, collapsedIds, dark])
 
@@ -139,6 +161,36 @@ function Flow() {
       return vis.map(n => byId[n.id] ? { ...n, position: byId[n.id].position } : n)
     })
     setTimeout(() => rf.fitView({ padding: 0.15, duration: 400 }), 60)
+  }
+
+  // Thu gọn tại 1 node: ẩn toàn bộ nhánh dưới của node đó (các node có cấp lớn hơn,
+  // nối liên tiếp từ node đó) — node gốc và các nhánh khác không bị ảnh hưởng.
+  function collapseFrom(id) {
+    const start = nodes.find(n => n.id === id)
+    if (!start) return
+    const startLevel = start.data.level ?? 1
+    const levelOf = (nid) => nodes.find(n => n.id === nid)?.data.level ?? 1
+    const toHide = new Set(), visited = new Set([id]), queue = [id]
+    while (queue.length) {
+      const cur = queue.shift()
+      edges.forEach(e => {
+        const other = e.source === cur ? e.target : e.target === cur ? e.source : null
+        if (!other || visited.has(other)) return
+        visited.add(other)
+        if (levelOf(other) > startLevel) { toHide.add(other); queue.push(other) }
+      })
+    }
+    if (!toHide.size) return
+    const next = new Set([...collapsedIds, ...toHide])
+    setCollapsedIds(next)
+    setNodes(ns => ns.map(n => ({ ...n, hidden: next.has(n.id) })))
+    if (selectedId && toHide.has(selectedId)) setSelectedId(id)
+    setTimeout(() => rf.fitView({ padding: 0.15, duration: 400 }), 60)
+  }
+
+  function toggleNode(id) {
+    const hasHiddenNeighbour = edges.some(e => ((e.source === id && collapsedIds.has(e.target)) || (e.target === id && collapsedIds.has(e.source))))
+    if (hasHiddenNeighbour) expandFrom(id); else collapseFrom(id)
   }
 
   const collapseAll = () => {
@@ -166,7 +218,7 @@ function Flow() {
     const meta = TYPE_META[type]
     const center = selected || nodes[0]
     const pos = center ? { x: center.position.x + 320, y: center.position.y + (Math.random() * 160 - 80) } : { x: 100, y: 100 }
-    const d = { id, type, title: `${meta.label} mới`, subtitle: 'Chưa cập nhật', status: 'Mới', value: '', note: '' }
+    const d = { id, type, title: `${meta.label} mới`, subtitle: 'Chưa cập nhật', status: 'Mới', value: '', note: '', level: (center?.data.level ?? 0) + 1 }
     setNodes(ns => [...ns, { id, type: 'crm', position: pos, data: d }])
     if (center) setEdges(es => [...es, { id: `e-${id}`, source: center.id, target: id, label: 'liên quan', style: { stroke: '#94a3b8' } }])
     setSelectedId(id)
