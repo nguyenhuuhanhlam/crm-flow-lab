@@ -11,8 +11,8 @@ export const TYPE_META = {
 }
 
 export const initialNodesData = [
-  { id: 'co-anphat', type: 'company', title: 'Cty CP Thực phẩm An Phát', subtitle: 'Khách hàng chính • TP.HCM', status: 'Đang giao dịch', value: 'Doanh thu năm: 4,2 tỷ', note: 'Khách VIP, mua định kỳ hằng quý. Ưu tiên chăm sóc qua chị Bình.' },
-  { id: 'ct-binh', type: 'contact', title: 'Trần Thị Bình', subtitle: 'Giám đốc mua hàng', status: 'Người quyết định', value: '0903 111 222', note: 'Thích trao đổi qua Zalo buổi sáng. Là đầu mối chính của An Phát.' },
+  { id: 'co-anphat', type: 'company', title: 'Công Ty Miền Tây', subtitle: 'Khách hàng chính • TP.HCM', status: 'Đang giao dịch', value: 'Doanh thu năm: 4,2 tỷ', note: 'Khách VIP, mua định kỳ hằng quý. Ưu tiên chăm sóc qua chị Bình.' },
+  { id: 'ct-binh', type: 'contact', title: 'Trần Thị Bình', subtitle: 'Giám đốc mua hàng', status: 'Người quyết định', value: '0903 111 222', note: 'Thích trao đổi qua Zalo buổi sáng. Là đầu mối chính của Miền Tây.' },
   { id: 'ct-cuong', type: 'contact', title: 'Lê Văn Cường', subtitle: 'Kế toán trưởng', status: 'Người ảnh hưởng', value: '0903 333 444', note: 'Quan tâm điều khoản thanh toán 30 ngày.' },
   { id: 'ct-dung', type: 'contact', title: 'Phạm Quốc Dũng', subtitle: 'Trưởng phòng IT', status: 'Người dùng cuối', value: '0903 555 666', note: 'Phụ trách tích hợp hệ thống.' },
   { id: 'deal-q1', type: 'deal', title: 'Hợp đồng cung cấp Q1/2026', subtitle: 'Giai đoạn: Đàm phán', status: 'Đang mở', value: '850.000.000 ₫', note: 'Xác suất chốt 70%. Chờ duyệt giá từ chị Bình.' },
@@ -21,7 +21,7 @@ export const initialNodesData = [
   { id: 'tk-baogia', type: 'ticket', title: 'Yêu cầu báo giá bổ sung', subtitle: 'Ưu tiên: Trung bình', status: 'Mới', value: 'Mở hôm nay', note: 'Chị Bình yêu cầu báo giá thêm 2 mặt hàng.' },
   { id: 'task-goi', type: 'task', title: 'Gọi chốt điều khoản Deal Q1', subtitle: 'Hạn: 22-10-2026', status: 'Chưa làm', value: 'Giao cho: Sales Hùng', note: 'Gọi chị Bình trước 10h sáng.' },
   { id: 'task-gui', type: 'task', title: 'Gửi báo giá bổ sung', subtitle: 'Hạn: 21-10-2026', status: 'Đang làm', value: 'Giao cho: Sales Hùng', note: 'Đính kèm catalogue mới.' },
-  // Nhánh ban đầu bị thu gọn — bấm nút + trên Cty An Phát / Sao Mai để mở ra
+  // Nhánh ban đầu bị thu gọn — bấm nút + trên Công Ty Miền Tây / Sao Mai để mở ra
   { id: 'co-saomai', type: 'company', title: 'Chuỗi bán lẻ Sao Mai', subtitle: 'Khách tiềm năng • Hà Nội', status: 'Tiềm năng', value: '28 cửa hàng', note: 'Được chị Bình giới thiệu. Chưa ký hợp đồng.', collapsed: true },
   { id: 'ct-ha', type: 'contact', title: 'Nguyễn Thu Hà', subtitle: 'CEO Sao Mai', status: 'Người quyết định', value: '0912 777 888', note: 'Gặp lần đầu tại hội chợ tháng 8.', collapsed: true },
   { id: 'deal-saomai', type: 'deal', title: 'Deal thử nghiệm 3 cửa hàng', subtitle: 'Giai đoạn: Tiếp cận', status: 'Đang mở', value: '300.000.000 ₫', note: 'Thử nghiệm trước khi nhân rộng 28 cửa hàng.', collapsed: true },

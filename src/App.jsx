@@ -229,7 +229,7 @@ function Flow() {
               <p>Click vào một node trên canvas để xem và sửa chi tiết tại đây. Đây là mẫu UX khuyến nghị cho CRM dạng graph: canvas để nhìn quan hệ, panel để nhập liệu — không nhồi form lên canvas.</p>
               <h4>Cách thử cảm giác dùng</h4>
               <ol>
-                <li>Bấm nút <b>＋</b> trên node Cty An Phát để mở nhánh Sao Mai / Minh Khang đang thu gọn.</li>
+                <li>Bấm nút <b>＋</b> trên node Công Ty Miền Tây để mở nhánh Sao Mai / Minh Khang đang thu gọn.</li>
                 <li>Kéo thả node, cuộn để zoom, kéo nền để pan, xem MiniMap góc trái dưới.</li>
                 <li>Kéo nối 2 node để tạo quan hệ mới, chọn edge rồi nhấn Delete để xóa.</li>
                 <li>Thêm node mới, sửa tên/trạng thái/ghi chú ở panel này, bấm Lưu bố cục rồi tải lại trang.</li>
