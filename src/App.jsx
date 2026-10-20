@@ -47,7 +47,7 @@ function CrmNode({ id, data, selected }) {
         <span className="crm-node-icon">{meta.icon}</span>
         <span className="crm-node-type" style={{ color: accent }}>{meta.label}</span>
         {data.concurrent ? <span className="badge-concurrent" title={`Kiêm nhiệm: ${data.concurrent}`}>kiêm nhiệm</span> : null}
-        {(data.hasHidden || data.canCollapse) ? (
+        {!data.focusMode && (data.hasHidden || data.canCollapse) ? (
           <button className="expand-btn nodrag" title={data.hasHidden ? 'Mở nhánh tại node này' : 'Thu gọn nhánh tại node này'} onClick={(e) => { e.stopPropagation(); data.onToggle(id) }}>{data.hasHidden ? '＋' : '−'}</button>
         ) : null}
       </div>
@@ -133,6 +133,10 @@ function Flow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Trạng thái Xem riêng — khai báo sớm vì decorated dùng tới
+  const [focusId, setFocusId] = useState(null)
+  const focusBackup = useRef(null)
+
   // Gắn cờ hasHidden / canCollapse + handler gạt mở-thu vào data của từng node
   const decorated = useMemo(() => nodes.map(n => {
     const myLevel = n.data.level ?? 1
@@ -145,9 +149,9 @@ function Flow() {
       const otherNode = nodes.find(x => x.id === other)
       if (otherNode && !collapsedIds.has(other) && (otherNode.data.level ?? 1) > myLevel) canCollapse = true
     })
-    return { ...n, data: { ...n.data, dark, hasHidden: neighbourHidden, canCollapse, onToggle: (id) => toggleNode(id) } }
+    return { ...n, data: { ...n.data, dark, focusMode: !!focusId, hasHidden: neighbourHidden, canCollapse, onToggle: (id) => toggleNode(id) } }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [nodes, edges, collapsedIds, dark])
+  }), [nodes, edges, collapsedIds, dark, focusId])
 
   function expandFrom(id) {
     const next = new Set(collapsedIds)
@@ -204,11 +208,15 @@ function Flow() {
     setNodes(ns => ns.map(n => ({ ...n, hidden: hidden.has(n.id) })))
   }
 
-  const visibleNodes = useMemo(() => decorated.filter(n => typeFilter[n.data.type] !== false), [decorated, typeFilter])
+  const visibleNodes = useMemo(() => {
+    if (focusSet) return decorated.filter(n => focusSet.has(n.id)).map(n => ({ ...n, hidden: false }))
+    return decorated.filter(n => typeFilter[n.data.type] !== false)
+  }, [decorated, typeFilter, focusSet])
   const visibleEdges = useMemo(() => edges.filter(e => {
+    if (focusSet) return focusSet.has(e.source) && focusSet.has(e.target)
     const s = decorated.find(n => n.id === e.source), t = decorated.find(n => n.id === e.target)
     return s && t && typeFilter[s.data.type] !== false && typeFilter[t.data.type] !== false && !s.hidden && !t.hidden
-  }).map(e => ({ ...e, labelStyle: { fontSize: 11, fill: dark ? '#cbd5e1' : '#64748b' } })), [edges, decorated, typeFilter, dark])
+  }).map(e => ({ ...e, labelStyle: { fontSize: 11, fill: dark ? '#cbd5e1' : '#64748b' } })), [edges, decorated, typeFilter, dark, focusSet])
 
   const selected = nodes.find(n => n.id === selectedId)
 
@@ -220,6 +228,53 @@ function Flow() {
   const [panelW, setPanelW] = useState(() => { try { return JSON.parse(localStorage.getItem('crm-panel') || '{}').w || 330 } catch { return 330 } })
   const [panelCollapsed, setPanelCollapsed] = useState(() => { try { return !!JSON.parse(localStorage.getItem('crm-panel') || '{}').collapsed } catch { return false } })
   useEffect(() => { localStorage.setItem('crm-panel', JSON.stringify({ w: panelW, collapsed: panelCollapsed })) }, [panelW, panelCollapsed])
+
+  // ----- Chế độ Xem riêng (focus): chỉ hiện 1 node + quan hệ trực tiếp + chuỗi cấp trên -----
+  const computeFocusSet = useCallback((id) => {
+    const s = new Set([id])
+    edges.forEach(e => { if (e.source === id) s.add(e.target); if (e.target === id) s.add(e.source) })
+    // chuỗi cấp trên: đi ngược quan hệ chính (bỏ qua quan hệ kiêm nhiệm)
+    let cur = id
+    const chainSeen = new Set([id])
+    while (cur) {
+      const up = edges.find(e => e.source === cur && !e.secondary)
+      if (!up) break
+      const parent = up.target
+      if (parent === cur || chainSeen.has(parent)) break
+      chainSeen.add(parent); s.add(parent)
+      if (parent === 'co-mientay') break
+      cur = parent
+    }
+    return s
+  }, [edges])
+
+  const focusSet = useMemo(() => (focusId ? computeFocusSet(focusId) : null), [focusId, computeFocusSet])
+
+  function enterFocus(id) {
+    if (!focusId) {
+      focusBackup.current = { positions: Object.fromEntries(nodes.map(n => [n.id, n.position])), collapsedIds: new Set(collapsedIds) }
+    }
+    setFocusId(id); setSelectedId(id); setPanelCollapsed(false)
+    const set = computeFocusSet(id)
+    setNodes(ns => {
+      const sub = ns.filter(n => set.has(n.id)).map(n => ({ ...n, hidden: false }))
+      const laid = layout(sub, edges.filter(e => set.has(e.source) && set.has(e.target)))
+      const byId = Object.fromEntries(laid.map(n => [n.id, n]))
+      return ns.map(n => byId[n.id] ? { ...n, position: byId[n.id].position } : n)
+    })
+    setTimeout(() => rf.fitView({ padding: 0.2, duration: 400 }), 60)
+  }
+
+  function exitFocus() {
+    const b = focusBackup.current
+    if (b) {
+      setCollapsedIds(b.collapsedIds)
+      setNodes(ns => ns.map(n => ({ ...n, position: b.positions[n.id] ?? n.position, hidden: b.collapsedIds.has(n.id) })))
+      focusBackup.current = null
+    }
+    setFocusId(null)
+    setTimeout(() => rf.fitView({ padding: 0.15, duration: 400 }), 60)
+  }
 
   const startResize = (e) => {
     e.preventDefault()
@@ -300,6 +355,10 @@ function Flow() {
 
   const deleteSelected = () => {
     if (!selectedId) return
+    if (focusId === selectedId) { // xóa đúng node đang xem riêng -> thoát focus, khôi phục trạng thái thu/mở
+      if (focusBackup.current) { setCollapsedIds(focusBackup.current.collapsedIds); focusBackup.current = null }
+      setFocusId(null)
+    }
     setNodes(ns => ns.filter(n => n.id !== selectedId))
     setEdges(es => es.filter(e => e.source !== selectedId && e.target !== selectedId))
     setSelectedId(null)
@@ -374,7 +433,7 @@ function Flow() {
           <ReactFlow
             nodes={visibleNodes} edges={visibleEdges}
             onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
-            onNodeClick={(_, n) => { setSelectedId(n.id); setPanelCollapsed(false) }} onPaneClick={() => setSelectedId(null)}
+            onNodeClick={(_, n) => { setSelectedId(n.id); setPanelCollapsed(false) }} onNodeDoubleClick={(_, n) => enterFocus(n.id)} onPaneClick={() => setSelectedId(null)}
             nodeTypes={nodeTypes} fitView minZoom={0.2} maxZoom={1.8}
             colorMode={dark ? 'dark' : 'light'}
           >
@@ -382,6 +441,12 @@ function Flow() {
             <Controls />
             <MiniMap pannable zoomable />
           </ReactFlow>
+          {focusId && (
+            <div className="focus-banner">
+              <span>Đang xem riêng: <b>{nodes.find(n => n.id === focusId)?.data.title}</b> — chỉ hiện node này, các quan hệ trực tiếp và chuỗi cấp trên</span>
+              <button onClick={exitFocus}>Thoát xem riêng</button>
+            </div>
+          )}
           {panelCollapsed && (
             <button className="panel-reopen" onClick={() => setPanelCollapsed(false)} title="Mở panel thông tin" aria-label="Mở panel thông tin">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{ICONS.chevronLeft}</svg>
@@ -403,6 +468,7 @@ function Flow() {
               <h4>Cách thử cảm giác dùng</h4>
               <ol>
                 <li>Bấm nút <b>＋</b> trên từng bộ môn để mở danh sách nhân viên đang thu gọn.</li>
+                <li><b>Nhấp đúp</b> vào 1 node (hoặc nút "Xem riêng node này" trong panel) để chỉ xem node đó và các quan hệ trực tiếp của nó.</li>
                 <li>Kéo thả node, cuộn để zoom, kéo nền để pan, xem MiniMap góc trái dưới.</li>
                 <li>Kéo nối 2 node để tạo quan hệ mới, chọn edge rồi nhấn Delete để xóa.</li>
                 <li>Thêm node mới, sửa tên/trạng thái/ghi chú ở panel này, bấm Lưu bố cục rồi tải lại trang.</li>
@@ -411,6 +477,9 @@ function Flow() {
           ) : (
             <div>
               <div className="panel-type" style={{ color: TYPE_META[selected.data.type].color }}>{TYPE_META[selected.data.type].icon} {TYPE_META[selected.data.type].label}</div>
+              {focusId === selected.id
+                ? <button className="focus-btn active" onClick={exitFocus}>✕ Thoát xem riêng</button>
+                : <button className="focus-btn" onClick={() => enterFocus(selected.id)}>◎ Xem riêng node này</button>}
               <div className="tabs" role="tablist">
                 {[['tongquan', 'Tổng quan'], ['chitiet', 'Chi tiết'], ['hoatdong', 'Hoạt động'], ['tailieu', 'Tài liệu']].map(([k, label]) => (
                   <button key={k} role="tab" aria-selected={panelTab === k} className={`tab-btn ${panelTab === k ? 'active' : ''}`} onClick={() => setPanelTab(k)}>{label}</button>
