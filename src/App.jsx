@@ -26,7 +26,7 @@ import { TextInput } from '@astryxdesign/core/TextInput'
 import { TopNav } from '@astryxdesign/core/TopNav'
 import { TreeList } from '@astryxdesign/core/TreeList'
 import { createStaticSource } from '@astryxdesign/core/Typeahead'
-import { Building2, Folder, LogOut, Network, Search, ShieldCheck } from 'lucide-react'
+import { Building2, ChevronLeft, ChevronRight, ClipboardList, Factory, FileText, Focus, Folder, LayoutGrid, LogOut, Minimize2, Network, RotateCcw, Save, Search, ShieldCheck, User, X } from 'lucide-react'
 import { TYPE_META, initialNodesData, initialEdgesData } from './data'
 
 // ---------- Auto-layout bằng Dagre (hierarchical, trái -> phải) ----------
@@ -66,7 +66,7 @@ function CrmNode({ id, data, selected }) {
     <div className={`crm-node crm-node-${data.type} ${selected ? 'selected' : ''}`} style={{ background: data.dark ? meta.darkBg : meta.bg, borderColor: selected ? accent : (data.dark ? meta.darkBorder : meta.border) }}>
       <Handle type="target" position={Position.Left} />
       <div className="crm-node-head">
-        <span className="crm-node-icon">{meta.icon}</span>
+        <span className="crm-node-icon">{(() => { const TypeIcon = TYPE_ICONS[data.type]; return <TypeIcon size={15} color={accent} strokeWidth={2.2} /> })()}</span>
         <span className="crm-node-type" style={{ color: accent }}>{meta.label}</span>
         {data.concurrent ? <span className="badge-concurrent" title={`Kiêm nhiệm: ${data.concurrent}`}>kiêm nhiệm</span> : null}
         {!data.focusMode && (data.hasHidden || data.canCollapse) ? (
@@ -97,18 +97,20 @@ const norm = (s) => (s || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCas
 
 // Icon SVG nhỏ cho các nút ở topbar (chỉ icon cho gọn, nhãn nằm trong tooltip)
 const ICONS = {
-  search: (<><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></>),
-  layout: (<><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>),
-  collapse: (<><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" /></>),
-  save: (<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></>),
-  reset: (<><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></>),
-  chevronRight: (<><polyline points="9 18 15 12 9 6" /></>),
-  chevronLeft: (<><polyline points="15 18 9 12 15 6" /></>),
+  search: Search,
+  layout: LayoutGrid,
+  collapse: Minimize2,
+  save: Save,
+  reset: RotateCcw,
+  chevronRight: ChevronRight,
+  chevronLeft: ChevronLeft,
 }
+// Icon theo loại node (Lucide) — dùng cho thẻ node, panel và nút Thêm node
+const TYPE_ICONS = { company: Factory, department: Building2, employee: User, task: ClipboardList }
 function IconBtn({ icon, label, onClick }) {
   return (
     <IconButton label={label} onClick={onClick} variant="ghost"
-      icon={<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{ICONS[icon]}</svg>} />
+      icon={<Icon icon={ICONS[icon]} size="sm" />} />
   )
 }
 
@@ -645,7 +647,7 @@ function Flow() {
         <div className="content">
           <div className="toolbar">
             <span className="toolbar-label">Thêm node (nối vào node đang chọn):</span>
-            {Object.entries(TYPE_META).map(([k, m]) => <Button key={k} size="sm" label={`${m.icon} ${m.label}`} onClick={() => addNode(k)} />)}
+            {Object.entries(TYPE_META).map(([k, m]) => <Button key={k} size="sm" label={m.label} icon={<Icon icon={TYPE_ICONS[k]} size="xsm" />} onClick={() => addNode(k)} />)}
             <span className="sep" />
             <span className="toolbar-label">Lọc loại:</span>
             {Object.entries(TYPE_META).map(([k, m]) => (
@@ -706,11 +708,11 @@ function Flow() {
             </div>
           ) : (
             <div>
-              <div className="panel-type" style={{ color: TYPE_META[selected.data.type].color }}>{TYPE_META[selected.data.type].icon} {TYPE_META[selected.data.type].label}</div>
+              <div className="panel-type" style={{ color: TYPE_META[selected.data.type].color }}>{(() => { const TypeIcon = TYPE_ICONS[selected.data.type]; return <TypeIcon size={14} /> })()} {TYPE_META[selected.data.type].label}</div>
               <div className="focus-btn-wrap">
                 {focusId === selected.id
-                  ? <Button variant="destructive" label="✕ Thoát xem riêng" onClick={exitFocus} />
-                  : <Button label="◎ Xem riêng node này" onClick={() => enterFocus(selected.id)} />}
+                  ? <Button variant="destructive" label="Thoát xem riêng" icon={<Icon icon={X} size="xsm" />} onClick={exitFocus} />
+                  : <Button label="Xem riêng node này" icon={<Icon icon={Focus} size="xsm" />} onClick={() => enterFocus(selected.id)} />}
               </div>
               <TabList value={panelTab} onChange={setPanelTab} hasDivider>
                 {[['tongquan', 'Tổng quan'], ['chitiet', 'Chi tiết'], ['hoatdong', 'Hoạt động'], ['tailieu', 'Tài liệu']].map(([k, label]) => (
@@ -756,7 +758,7 @@ function Flow() {
               {panelTab === 'tailieu' && (
                 <div className="doc-list" role="tabpanel" id="paneltab-tailieu">
                   {docRows(selected).map(([name, meta]) => (
-                    <div key={name} className="doc-row"><span className="doc-icon">📄</span><span className="doc-main"><span className="doc-name">{name}</span><span className="doc-meta">{meta}</span></span><Button size="sm" label="Tải" onClick={() => alert('Tài liệu mẫu — chưa nối kho file thật.')} /></div>
+                    <div key={name} className="doc-row"><span className="doc-icon"><FileText size={17} /></span><span className="doc-main"><span className="doc-name">{name}</span><span className="doc-meta">{meta}</span></span><Button size="sm" label="Tải" onClick={() => alert('Tài liệu mẫu — chưa nối kho file thật.')} /></div>
                   ))}
                   <p className="muted">Tài liệu đính kèm theo node (dữ liệu mẫu).</p>
                 </div>

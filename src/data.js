@@ -7,10 +7,10 @@
 // edges đến từ quan hệ trực thuộc (department.company_id, employee.department_id).
 
 export const TYPE_META = {
-  company:    { label: 'Công ty', icon: '🏢', color: '#2563eb', bg: '#eff6ff', border: '#93c5fd', darkColor: '#60a5fa', darkBg: '#172554', darkBorder: '#1d4ed8' },
-  department: { label: 'Bộ môn', icon: '🗂️', color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', darkColor: '#34d399', darkBg: '#022c22', darkBorder: '#047857' },
-  employee:   { label: 'Nhân viên', icon: '👤', color: '#d97706', bg: '#fffbeb', border: '#fcd34d', darkColor: '#fbbf24', darkBg: '#451a03', darkBorder: '#b45309' },
-  task:       { label: 'Công việc', icon: '📋', color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd', darkColor: '#a78bfa', darkBg: '#2e1065', darkBorder: '#6d28d9' },
+  company:    { label: 'Công ty', color: '#2563eb', bg: '#eff6ff', border: '#93c5fd', darkColor: '#60a5fa', darkBg: '#172554', darkBorder: '#1d4ed8' },
+  department: { label: 'Bộ môn', color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', darkColor: '#34d399', darkBg: '#022c22', darkBorder: '#047857' },
+  employee:   { label: 'Nhân viên', color: '#d97706', bg: '#fffbeb', border: '#fcd34d', darkColor: '#fbbf24', darkBg: '#451a03', darkBorder: '#b45309' },
+  task:       { label: 'Công việc', color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd', darkColor: '#a78bfa', darkBg: '#2e1065', darkBorder: '#6d28d9' },
 }
 
 export const initialNodesData = [
