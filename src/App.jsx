@@ -591,14 +591,31 @@ function Flow() {
     setSelectedId(null)
   }
 
+  // Chuẩn hóa phía nối của MỌI line theo hình học hiện tại: hai đầu line luôn bám vào
+  // phía đối diện nhau của 2 thẻ (theo phía mọc của nhánh chứa node con). Phía của từng
+  // nhánh được đọc TRƯỚC từ chính handle hiện tại (line vào Công ty) nên nhánh đã ghim
+  // phía vẫn giữ nguyên phía sau khi chuẩn hóa; chỉ phía bám của từng line là được sửa lại.
+  const normalizeHandles = (edgeList, d = dir) => {
+    const lvl = (id) => nodes.find(n => n.id === id)?.data.level ?? 1
+    return edgeList.map(e => {
+      const sourceIsChild = lvl(e.source) >= lvl(e.target)
+      const g = branchSideOf(sourceIsChild ? e.source : e.target, edgeList, d)
+      const childSide = g === 'right' ? 'left' : 'right'
+      const parentSide = g === 'right' ? 'right' : 'left'
+      return { ...e, customHandles: true, sourceHandle: `s-${sourceIsChild ? childSide : parentSide}`, targetHandle: `t-${sourceIsChild ? parentSide : childSide}` }
+    })
+  }
+
   // Sắp xếp lại kiểu mindmap (mỗi nhánh theo phía nối của nó). Đang Xem riêng thì CHỈ sắp xếp
   // trong tập node đang xem, không layout lại toàn đồ thị — tránh các node đang hiện nhảy lung tung.
   // edgeList/d cho phép sắp xếp ngay theo dữ liệu vừa đổi (chưa kịp qua state).
   const applyLayout = (edgeList = edges, d = dir) => {
+    const normalized = normalizeHandles(edgeList, d)
+    setEdges(normalized)
     if (focusSet) {
       setNodes(ns => {
         const sub = ns.filter(n => focusSet.has(n.id)).map(n => ({ ...n, hidden: false }))
-        const laid = layoutDir(sub, edgeList.filter(e => focusSet.has(e.source) && focusSet.has(e.target)), d, edgeList)
+        const laid = layoutDir(sub, normalized.filter(e => focusSet.has(e.source) && focusSet.has(e.target)), d, normalized)
         const byId = Object.fromEntries(laid.map(n => [n.id, n]))
         return ns.map(n => byId[n.id] ? { ...n, position: byId[n.id].position } : n)
       })
@@ -607,7 +624,7 @@ function Flow() {
     }
     setNodes(ns => {
       const vis = ns.filter(n => !n.hidden)
-      const laid = layoutDir(vis, edgeList, d, edgeList)
+      const laid = layoutDir(vis, normalized, d, normalized)
       const byId = Object.fromEntries(laid.map(n => [n.id, n]))
       return ns.map(n => byId[n.id] ? { ...n, position: byId[n.id].position } : n)
     })
