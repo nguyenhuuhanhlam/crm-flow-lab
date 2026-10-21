@@ -48,6 +48,8 @@
 .crm-node-task .crm-node-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .crm-node-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
 .status-cell { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+/* Nội dung tab cách dải tabs 1 khoảng cho thoáng, dễ nhìn */
+.panel [role="tabpanel"] { margin-top: 16px; }
 .badge { font-size: 11px; font-weight: 600; border: 1px solid; border-radius: 999px; padding: 2px 7px; white-space: nowrap; }
 .crm-node-value { font-size: 11.5px; color: #475569; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .react-flow__handle { width: 10px; height: 10px; }
