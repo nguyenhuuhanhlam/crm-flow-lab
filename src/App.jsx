@@ -31,7 +31,7 @@ import { TYPE_META, initialNodesData, initialEdgesData } from './data'
 
 // ---------- Auto-layout bằng Dagre (hierarchical, trái -> phải) ----------
 const NODE_W = 250, NODE_H = 92
-function layout(nodes, edges, direction = 'LR') {
+function layout(nodes, edges, direction = 'RL') {
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
   g.setGraph({ rankdir: direction, nodesep: 28, ranksep: 90 })
@@ -64,7 +64,7 @@ function CrmNode({ id, data, selected }) {
   const accent = data.dark ? meta.darkColor : meta.color
   return (
     <div className={`crm-node crm-node-${data.type} ${selected ? 'selected' : ''}`} style={{ background: data.dark ? meta.darkBg : meta.bg, borderColor: selected ? accent : (data.dark ? meta.darkBorder : meta.border) }}>
-      <Handle type="target" position={Position.Left} />
+      <Handle type="target" position={Position.Right} />
       <div className="crm-node-head">
         <span className="crm-node-icon">{(() => { const TypeIcon = TYPE_ICONS[data.type]; return <TypeIcon size={15} color={accent} strokeWidth={2.2} /> })()}</span>
         <span className="crm-node-type" style={{ color: accent }}>{meta.label}</span>
@@ -87,7 +87,7 @@ function CrmNode({ id, data, selected }) {
           <span className="crm-node-value">{data.value}</span>
         </div>
       )}
-      <Handle type="source" position={Position.Right} />
+      <Handle type="source" position={Position.Left} />
     </div>
   )
 }
@@ -164,7 +164,7 @@ function Flow() {
   useEffect(() => {
     if (initDone.current) return
     initDone.current = true
-    const saved = (() => { try { return JSON.parse(localStorage.getItem('crm-node-proto-v5') || 'null') } catch { return null } })()
+    const saved = (() => { try { return JSON.parse(localStorage.getItem('crm-node-proto-v6') || 'null') } catch { return null } })()
     const hidden = new Set(initialNodesData.filter(n => n.collapsed).map(n => n.id))
     let ns = initialNodesData.map(d => toFlowNode(d, hidden))
     let es = initialEdgesData.map(e => ({ ...e, animated: false, style: e.secondary ? { stroke: '#d97706', strokeWidth: 2, strokeDasharray: '7 5' } : { stroke: '#94a3b8' }, labelStyle: { fontSize: 11, fill: e.secondary ? '#d97706' : '#64748b', fontWeight: e.secondary ? 700 : 400 } }))
@@ -524,10 +524,10 @@ function Flow() {
     const builtin = new Set(initialNodesData.map(n => n.id))
     const extraNodes = nodes.filter(n => !builtin.has(n.id))
     const extraEdges = edges.filter(e => !initialEdgesData.some(x => x.id === e.id))
-    localStorage.setItem('crm-node-proto-v5', JSON.stringify({ nodes: nodes.map(n => ({ id: n.id, position: n.position })), extraNodes, extraEdges }))
+    localStorage.setItem('crm-node-proto-v6', JSON.stringify({ nodes: nodes.map(n => ({ id: n.id, position: n.position })), extraNodes, extraEdges }))
     alert('Đã lưu vị trí + node mới vào trình duyệt (localStorage). Tải lại trang sẽ khôi phục.')
   }
-  const reset = () => { localStorage.removeItem('crm-node-proto-v5'); location.reload() }
+  const reset = () => { localStorage.removeItem('crm-node-proto-v6'); location.reload() }
 
   const sideGroups = useMemo(() => ({
     department: nodes.filter(n => n.data.type === 'department'),
