@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
-  Handle, Position, addEdge, useNodesState, useEdgesState, useReactFlow,
+  Handle, Position, addEdge, reconnectEdge, useNodesState, useEdgesState, useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import dagre from 'dagre'
@@ -155,7 +155,44 @@ function Flow() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const [dir, setDir] = useState(() => { try { return localStorage.getItem('crm-dir') || 'right' } catch { return 'right' } })
   useEffect(() => { try { localStorage.setItem('crm-dir', dir) } catch { /* bỏ qua */ } }, [dir])
-  const layoutDir = (ns, es) => layout(ns, es, rankFor(dir))
+  const ROOT_ID = 'co-mientay'
+  // ----- Mindmap 2 phía: mỗi nhánh con trực tiếp của Công ty mọc về phía mà line của nó bám vào
+  // Công ty (handle t-left -> mọc sang trái, t-right -> sang phải); nhánh chưa tùy chỉnh phía thì
+  // theo chiều mặc định `dir`. Toàn bộ subtree (nhân viên, công việc) đi theo phía của nhánh.
+  const sideAtRoot = (e, dflt) => (e && e.customHandles && e.targetHandle ? (e.targetHandle === 't-left' ? 'left' : 'right') : dflt)
+  const branchRootOf = (nodeId, edgeList) => {
+    let cur = nodeId, guard = 0
+    while (cur && cur !== ROOT_ID && guard++ < 30) {
+      const pe = edgeList.find(e => e.source === cur && !e.secondary)
+      if (!pe) return null
+      if (pe.target === ROOT_ID) return cur
+      cur = pe.target
+    }
+    return null
+  }
+  const branchSideOf = (nodeId, edgeList = edges, dflt = dir) => {
+    if (nodeId === ROOT_ID) return dflt
+    const br = branchRootOf(nodeId, edgeList)
+    if (!br) return dflt
+    return sideAtRoot(edgeList.find(x => x.source === br && x.target === ROOT_ID && !x.secondary), dflt)
+  }
+  // Layout mindmap: tách tập node theo phía nhánh, chạy Dagre riêng từng phía
+  // (phải: rankdir RL, trái: LR) rồi ghép lại, căn trùng vị trí node Công ty của 2 lượt chạy.
+  const layoutMindmap = (list, induced, allEdges, dflt) => {
+    const root = list.find(n => n.data.type === 'company')
+    if (!root) return layout(list, induced, rankFor(branchSideOf(list[0]?.id, allEdges, dflt)))
+    const rightIds = new Set(list.filter(n => n.id === root.id || branchSideOf(n.id, allEdges, dflt) === 'right').map(n => n.id))
+    const leftIds = new Set(list.filter(n => n.id === root.id || branchSideOf(n.id, allEdges, dflt) === 'left').map(n => n.id))
+    const inSet = (set) => (e) => set.has(e.source) && set.has(e.target)
+    const laidR = layout(list.filter(n => rightIds.has(n.id)), induced.filter(inSet(rightIds)), 'RL')
+    const laidL = layout(list.filter(n => leftIds.has(n.id)), induced.filter(inSet(leftIds)), 'LR')
+    const rPos = laidR.find(n => n.id === root.id)?.position || { x: 0, y: 0 }
+    const lPos = laidL.find(n => n.id === root.id)?.position || { x: 0, y: 0 }
+    const merged = new Map(laidR.map(n => [n.id, n]))
+    laidL.forEach(n => { if (n.id !== root.id) merged.set(n.id, { ...n, position: { x: n.position.x + (rPos.x - lPos.x), y: n.position.y + (rPos.y - lPos.y) } }) })
+    return list.map(n => merged.get(n.id) || n)
+  }
+  const layoutDir = (ns, es, d = dir, allEdges = es) => layoutMindmap(ns, es, allEdges, d)
   const initDone = useRef(false)
 
   // Chặn xóa bằng phím Delete/Backspace trên canvas đối với node quan trọng (công ty, bộ môn):
@@ -303,15 +340,16 @@ function Flow() {
     const s = decorated.find(n => n.id === e.source), t = decorated.find(n => n.id === e.target)
     return s && t && typeFilter[s.data.type] !== false && typeFilter[t.data.type] !== false && !s.hidden && !t.hidden
   }).map(e => {
-    if (e.customHandles && e.sourceHandle && e.targetHandle) return { ...e, label: undefined }
-    // Phía nối mặc định: node con quay mặt về cha, node cha quay mặt về con — theo chiều bố cục hiện tại
+    if (e.customHandles && e.sourceHandle && e.targetHandle) return { ...e, label: undefined, reconnectable: true }
+    // Phía nối mặc định theo phía mọc của NHÁNH chứa node con (mindmap): con quay mặt về cha, cha quay mặt về con
     const sl = decorated.find(n => n.id === e.source)?.data.level ?? 1
     const tl = decorated.find(n => n.id === e.target)?.data.level ?? 1
-    const childSide = dir === 'right' ? 'left' : 'right'
-    const parentSide = dir === 'right' ? 'right' : 'left'
     const sourceIsChild = sl >= tl
+    const g = branchSideOf(sourceIsChild ? e.source : e.target)
+    const childSide = g === 'right' ? 'left' : 'right'
+    const parentSide = g === 'right' ? 'right' : 'left'
     return {
-      ...e, label: undefined,
+      ...e, label: undefined, reconnectable: true,
       sourceHandle: `s-${sourceIsChild ? childSide : parentSide}`,
       targetHandle: `t-${sourceIsChild ? parentSide : childSide}`,
     }
@@ -509,6 +547,23 @@ function Flow() {
 
   const onConnect = useCallback((params) => setEdges(es => addEdge({ ...params, customHandles: true, label: 'liên quan', style: { stroke: '#94a3b8' } }, es)), [setEdges])
 
+  // Kéo đầu line đang nối vào Công ty sang phía đối diện -> nhánh đó đổi phía mọc (mindmap), sắp xếp lại ngay
+  const onReconnect = (oldEdge, conn) => {
+    const next = reconnectEdge(oldEdge, { ...conn, customHandles: true }, edges)
+    setEdges(next)
+    if (oldEdge.target === ROOT_ID || conn.target === ROOT_ID) applyLayout(next)
+  }
+  // Nút trong panel bộ môn: đưa cả nhánh sang phía đối diện của Công ty
+  const flipBranch = () => {
+    if (!selected || selected.data.type !== 'department') return
+    const e = edges.find(x => x.source === selected.id && x.target === ROOT_ID && !x.secondary)
+    if (!e) return
+    const nextSide = branchSideOf(selected.id) === 'right' ? 'left' : 'right'
+    const next = edges.map(x => x.id === e.id ? { ...x, customHandles: true, sourceHandle: nextSide === 'left' ? 's-right' : 's-left', targetHandle: nextSide === 'left' ? 't-left' : 't-right' } : x)
+    setEdges(next)
+    applyLayout(next)
+  }
+
   const updateSelected = (patch) => {
     setNodes(ns => ns.map(n => n.id === selectedId ? { ...n, data: { ...n.data, ...patch } } : n))
   }
@@ -536,13 +591,14 @@ function Flow() {
     setSelectedId(null)
   }
 
-  // Sắp xếp lại theo 1 rankdir cho trước. Đang Xem riêng thì CHỈ sắp xếp trong tập node đang xem
-  // (như lúc vào focus), không layout lại toàn đồ thị — tránh các node đang hiện nhảy vị trí lung tung
-  const applyLayout = (rank) => {
+  // Sắp xếp lại kiểu mindmap (mỗi nhánh theo phía nối của nó). Đang Xem riêng thì CHỈ sắp xếp
+  // trong tập node đang xem, không layout lại toàn đồ thị — tránh các node đang hiện nhảy lung tung.
+  // edgeList/d cho phép sắp xếp ngay theo dữ liệu vừa đổi (chưa kịp qua state).
+  const applyLayout = (edgeList = edges, d = dir) => {
     if (focusSet) {
       setNodes(ns => {
         const sub = ns.filter(n => focusSet.has(n.id)).map(n => ({ ...n, hidden: false }))
-        const laid = layout(sub, edges.filter(e => focusSet.has(e.source) && focusSet.has(e.target)), rank)
+        const laid = layoutDir(sub, edgeList.filter(e => focusSet.has(e.source) && focusSet.has(e.target)), d, edgeList)
         const byId = Object.fromEntries(laid.map(n => [n.id, n]))
         return ns.map(n => byId[n.id] ? { ...n, position: byId[n.id].position } : n)
       })
@@ -551,19 +607,20 @@ function Flow() {
     }
     setNodes(ns => {
       const vis = ns.filter(n => !n.hidden)
-      const laid = layout(vis, edges, rank)
+      const laid = layoutDir(vis, edgeList, d, edgeList)
       const byId = Object.fromEntries(laid.map(n => [n.id, n]))
       return ns.map(n => byId[n.id] ? { ...n, position: byId[n.id].position } : n)
     })
     setTimeout(() => rf.fitView({ padding: 0.15, duration: 400 }), 60)
   }
-  const relayout = () => applyLayout(rankFor(dir))
+  const relayout = () => applyLayout()
 
-  // Đổi chiều mở rộng của cây: phải <-> trái, sắp xếp lại ngay theo chiều mới (tôn trọng Xem riêng)
+  // Đổi chiều MẶC ĐỊNH: chỉ các nhánh chưa được tùy chỉnh phía mới đổi theo; nhánh đã ghim
+  // phía bằng nút chuyển nhánh / kéo nối lại thì giữ nguyên phía của nó
   const flipDirection = () => {
     const nd = dir === 'right' ? 'left' : 'right'
     setDir(nd)
-    applyLayout(rankFor(nd))
+    applyLayout(edges, nd)
   }
 
   const save = () => {
@@ -711,7 +768,7 @@ function Flow() {
         <div className="canvas">
           <ReactFlow
             nodes={visibleNodes} edges={visibleEdges}
-            onNodesChange={handleNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
+            onNodesChange={handleNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onReconnect={onReconnect}
             onNodeClick={(_, n) => { setSelectedId(n.id); setPanelCollapsed(false) }} onEdgeClick={() => { setSelectedId(null); setPanelCollapsed(false) }} onNodeDoubleClick={(_, n) => enterFocus(n.id)} onPaneClick={() => setSelectedId(null)}
             nodeTypes={nodeTypes} fitView minZoom={0.2} maxZoom={1.8}
             colorMode={dark ? 'dark' : 'light'}
@@ -773,6 +830,11 @@ function Flow() {
                   ? <Button variant="destructive" label="Thoát xem riêng" icon={<Icon icon={X} size="xsm" />} onClick={exitFocus} />
                   : <Button label="Xem riêng node này" icon={<Icon icon={Focus} size="xsm" />} onClick={() => enterFocus(selected.id)} />}
               </div>
+              {selected.data.type === 'department' && (
+                <div className="focus-btn-wrap" style={{ marginTop: 8 }}>
+                  <Button variant="secondary" label={branchSideOf(selected.id) === 'right' ? 'Đưa nhánh sang trái' : 'Đưa nhánh sang phải'} icon={<Icon icon={ArrowLeftRight} size="xsm" />} onClick={flipBranch} />
+                </div>
+              )}
               <TabList value={panelTab} onChange={setPanelTab} hasDivider>
                 {[['tongquan', 'Tổng quan'], ['chitiet', 'Chi tiết'], ['hoatdong', 'Hoạt động'], ['tailieu', 'Tài liệu']].map(([k, label]) => (
                   <Tab key={k} value={k} label={label} panelId={`paneltab-${k}`} />
