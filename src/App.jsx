@@ -26,7 +26,7 @@ import { TextInput } from '@astryxdesign/core/TextInput'
 import { TopNav } from '@astryxdesign/core/TopNav'
 import { TreeList } from '@astryxdesign/core/TreeList'
 import { createStaticSource } from '@astryxdesign/core/Typeahead'
-import { ArrowLeftRight, Building2, ChevronLeft, ChevronRight, ClipboardList, Factory, FileText, Focus, Folder, LayoutGrid, LogOut, Minimize2, Network, RotateCcw, Save, Search, ShieldCheck, User, X } from 'lucide-react'
+import { ArrowLeftRight, Building2, ChevronLeft, ChevronRight, ClipboardList, Factory, FileText, Focus, Folder, LayoutGrid, LogOut, Minimize2, Network, RotateCcw, Save, Search, ShieldCheck, Spline, Trash2, User, X } from 'lucide-react'
 import { TYPE_META, initialNodesData, initialEdgesData } from './data'
 
 // ---------- Auto-layout bằng Dagre (hierarchical, trái -> phải) ----------
@@ -318,6 +318,22 @@ function Flow() {
   }), [edges, decorated, typeFilter, focusSet, dir])
 
   const selected = nodes.find(n => n.id === selectedId)
+  const selectedEdge = edges.find(e => e.selected)
+  const deleteSelectedEdge = () => { if (selectedEdge) setEdges(es => es.filter(e => e.id !== selectedEdge.id)) }
+  // Phím Delete/Backspace xóa line đang chọn: xử lý riêng vì khi click chuột vào line, tiêu điểm
+  // rơi vào phần tử SVG nên phím tắt mặc định của React Flow không kích hoạt. Bỏ qua khi đang gõ trong ô nhập.
+  useEffect(() => {
+    if (!selectedEdge) return undefined
+    const onKey = (e) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      const t = e.target
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      e.preventDefault()
+      deleteSelectedEdge()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedEdge])
 
   // ----- Panel phải dạng tabs: Tổng quan / Chi tiết / Hoạt động / Tài liệu -----
   const [panelTab, setPanelTab] = useState('tongquan')
@@ -696,7 +712,7 @@ function Flow() {
           <ReactFlow
             nodes={visibleNodes} edges={visibleEdges}
             onNodesChange={handleNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
-            onNodeClick={(_, n) => { setSelectedId(n.id); setPanelCollapsed(false) }} onNodeDoubleClick={(_, n) => enterFocus(n.id)} onPaneClick={() => setSelectedId(null)}
+            onNodeClick={(_, n) => { setSelectedId(n.id); setPanelCollapsed(false) }} onEdgeClick={() => { setSelectedId(null); setPanelCollapsed(false) }} onNodeDoubleClick={(_, n) => enterFocus(n.id)} onPaneClick={() => setSelectedId(null)}
             nodeTypes={nodeTypes} fitView minZoom={0.2} maxZoom={1.8}
             colorMode={dark ? 'dark' : 'light'}
           >
@@ -721,10 +737,22 @@ function Flow() {
         {!panelCollapsed && (
         <aside className="panel" style={{ width: panelW }}>
           <div className="panel-head">
-            <span>Thông tin node</span>
+            <span>{selectedEdge ? 'Thông tin line' : 'Thông tin node'}</span>
             <IconBtn icon="chevronRight" label="Thu gọn panel" onClick={() => setPanelCollapsed(true)} />
           </div>
-          {!selected ? (
+          {selectedEdge ? (
+            <div style={{ marginTop: 12 }}>
+              <div className="panel-type" style={{ color: '#94a3b8' }}><Spline size={14} /> Line kết nối</div>
+              <Stack gap={3} style={{ marginTop: 12 }}>
+                <Text>{nodes.find(n => n.id === selectedEdge.source)?.data.title} → {nodes.find(n => n.id === selectedEdge.target)?.data.title}</Text>
+                {selectedEdge.secondary && <p className="muted">Quan hệ kiêm nhiệm (đường nét đứt).</p>}
+                <div className="delete-wrap">
+                  <Button variant="destructive" label="Xóa line này" icon={<Icon icon={Trash2} size="xsm" />} onClick={deleteSelectedEdge} />
+                </div>
+                <p className="muted">Mẹo: cũng có thể nhấn phím Delete khi line đang được chọn.</p>
+              </Stack>
+            </div>
+          ) : !selected ? (
             <div className="panel-empty">
               <h3>Chưa chọn node nào</h3>
               <p>Click vào một node trên canvas để xem và sửa chi tiết tại đây. Đây là mẫu UX khuyến nghị cho CRM dạng graph: canvas để nhìn quan hệ, panel để nhập liệu — không nhồi form lên canvas.</p>
