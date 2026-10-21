@@ -62,6 +62,8 @@ function CrmNode({ id, data, selected }) {
   )
 }
 const nodeTypes = { crm: CrmNode }
+// Chuẩn hoá để tìm kiếm không dấu (giống command palette của NSDT)
+const norm = (s) => (s || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
 // Icon SVG nhỏ cho các nút ở topbar (chỉ icon cho gọn, nhãn nằm trong tooltip)
 const ICONS = {
@@ -86,6 +88,17 @@ function Flow() {
   const rf = useReactFlow()
   const [collapsedIds, setCollapsedIds] = useState(() => new Set(initialNodesData.filter(n => n.collapsed).map(n => n.id)))
   const [query, setQuery] = useState('')
+  // ----- Khung shell kiểu NSDT: sidebar điều hướng + command palette -----
+  const [shellSide, setShellSide] = useState(() => { try { return JSON.parse(localStorage.getItem('crm-shell') || '{}').side !== false } catch { return true } })
+  const [foldersOpen, setFoldersOpen] = useState(() => { try { return JSON.parse(localStorage.getItem('crm-shell') || '{}').folders || { dept: true, emp: true, task: true } } catch { return { dept: true, emp: true, task: true } } })
+  useEffect(() => { localStorage.setItem('crm-shell', JSON.stringify({ side: shellSide, folders: foldersOpen })) }, [shellSide, foldersOpen])
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [paletteQuery, setPaletteQuery] = useState('')
+  useEffect(() => {
+    const onKey = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o) } }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const [typeFilter, setTypeFilter] = useState(() => Object.fromEntries(Object.keys(TYPE_META).map(k => [k, true])))
   const [selectedId, setSelectedId] = useState('co-mientay')
   // Theme: 'system' | 'light' | 'dark' — lưu lựa chọn vào localStorage
@@ -275,6 +288,43 @@ function Flow() {
     setTimeout(() => rf.fitView({ padding: 0.15, duration: 400 }), 60)
   }
 
+  // Chuỗi cấp trên của 1 node (đi ngược quan hệ chính)
+  function ancestorChain(id) {
+    const chain = []
+    let cur = id
+    const seen = new Set([id])
+    while (cur) {
+      const e = edges.find(x => x.source === cur && !x.secondary)
+      if (!e || seen.has(e.target)) break
+      seen.add(e.target); chain.push(e.target); cur = e.target
+    }
+    return chain
+  }
+
+  // Nhảy tới 1 node từ sidebar / command palette: thoát xem riêng nếu đang bật,
+  // mở lại các nhánh đang thu trên đường đi, chọn node và đưa vào giữa canvas
+  function jumpToNode(id) {
+    let baseCollapsed = collapsedIds
+    let basePositions = null
+    if (focusId) {
+      const b = focusBackup.current
+      if (b) { baseCollapsed = b.collapsedIds; basePositions = b.positions; focusBackup.current = null }
+      setFocusId(null)
+    }
+    const chain = ancestorChain(id)
+    const next = new Set([...baseCollapsed].filter(x => !chain.includes(x)))
+    setCollapsedIds(next)
+    setNodes(ns => ns.map(n => ({
+      ...n,
+      position: basePositions?.[n.id] ?? n.position,
+      hidden: ancestorChain(n.id).some(a => next.has(a)),
+    })))
+    setSelectedId(id); setPanelCollapsed(false)
+    const target = nodes.find(n => n.id === id)
+    const pos = basePositions?.[id] ?? target?.position
+    if (pos) setTimeout(() => rf.setCenter(pos.x + 125, pos.y + 45, { zoom: 1.05, duration: 500 }), 80)
+  }
+
   const startResize = (e) => {
     e.preventDefault()
     const onMove = (ev) => setPanelW(Math.min(700, Math.max(260, window.innerWidth - ev.clientX)))
@@ -389,18 +439,32 @@ function Flow() {
     else alert('Không thấy node đang hiển thị nào khớp. Thử mở thêm nhánh bằng nút ＋.')
   }
 
+  const sideGroups = useMemo(() => ({
+    department: nodes.filter(n => n.data.type === 'department'),
+    employee: nodes.filter(n => n.data.type === 'employee'),
+    task: nodes.filter(n => n.data.type === 'task'),
+  }), [nodes])
+  const paletteNodes = useMemo(() => {
+    const q = norm(paletteQuery.trim())
+    const all = [...nodes].sort((a, b) => (LEVELS[a.id] ?? 9) - (LEVELS[b.id] ?? 9))
+    return (q ? all.filter(n => norm(n.data.title).includes(q) || norm(n.data.subtitle).includes(q)) : all).slice(0, 12)
+  }, [nodes, paletteQuery])
+
   const counts = useMemo(() => {
     const c = {}; nodes.forEach(n => { c[n.data.type] = (c[n.data.type] || 0) + 1 }); return c
   }, [nodes])
 
   return (
     <div className={`app ${dark ? 'dark' : ''}`}>
-      <header className="topbar">
-        <div>
-          <h1>CRM dạng Node — Prototype</h1>
-          <p>Kéo thả node • Kéo từ chấm bên phải node này sang chấm bên trái node khác để nối quan hệ • Click node để sửa ở panel phải</p>
-        </div>
-        <div className="top-actions">
+      <header className="shell-top">
+        <button className="icon-btn" onClick={() => setShellSide(s => !s)} title={shellSide ? 'Ẩn thanh điều hướng' : 'Hiện thanh điều hướng'} aria-label="Bật/tắt thanh điều hướng">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+        <div className="shell-brand"><strong>CRM Miền Tây</strong><span>Sơ đồ quan hệ</span></div>
+        <button className="palette-trigger" onClick={() => setPaletteOpen(true)} title="Tìm node hoặc lệnh (Ctrl+K)">
+          <span>🔍 Tìm node hoặc lệnh…</span><kbd>Ctrl K</kbd>
+        </button>
+        <div className="shell-top-right">
           <label className="theme-select">Theme
             <select value={themeMode} onChange={e => setThemeMode(e.target.value)} title="Chọn giao diện sáng / tối">
               <option value="system">Theo hệ thống</option>
@@ -408,26 +472,51 @@ function Flow() {
               <option value="dark">Tối</option>
             </select>
           </label>
-          <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && doSearch()} placeholder="Tìm bộ môn / nhân viên…" />
-          <IconBtn icon="search" label="Tìm" onClick={doSearch} />
-          <IconBtn icon="layout" label="Sắp xếp lại" onClick={relayout} />
-          <IconBtn icon="collapse" label="Thu gọn nhánh phụ" onClick={collapseAll} />
-          <IconBtn icon="save" label="Lưu bố cục" onClick={save} />
-          <IconBtn icon="reset" label="Đặt lại mẫu" onClick={reset} />
+          <button className="account-btn" title="Tài khoản (mẫu)">👤 Tài khoản</button>
         </div>
       </header>
 
-      <div className="toolbar">
-        <span className="toolbar-label">Thêm node (nối vào node đang chọn):</span>
-        {Object.entries(TYPE_META).map(([k, m]) => <button key={k} onClick={() => addNode(k)}>{m.icon} {m.label}</button>)}
-        <span className="sep" />
-        <span className="toolbar-label">Lọc loại:</span>
-        {Object.entries(TYPE_META).map(([k, m]) => (
-          <label key={k} className="chk"><input type="checkbox" checked={!!typeFilter[k]} onChange={e => setTypeFilter(f => ({ ...f, [k]: e.target.checked }))} /> {m.label} ({counts[k] || 0})</label>
-        ))}
-      </div>
+      <div className="shell-body">
+        {shellSide && (
+          <nav className="shell-side">
+            <div className="side-item active">🗺️ Sơ đồ quan hệ</div>
+            {[
+              ['department', '📁 Bộ môn', 'dept'],
+              ['employee', '👥 Nhân viên', 'emp'],
+              ['task', '📋 Công việc', 'task'],
+            ].map(([type, label, key]) => (
+              <div key={key}>
+                <div className="side-folder" onClick={() => setFoldersOpen(f => ({ ...f, [key]: !f[key] }))}>
+                  <span>{foldersOpen[key] ? '▾' : '▸'} {label}</span><span className="side-count">{sideGroups[type].length}</span>
+                </div>
+                {foldersOpen[key] && sideGroups[type].map(n => (
+                  <div key={n.id} className={`side-child ${selectedId === n.id ? 'active' : ''}`} title={n.data.title} onClick={() => jumpToNode(n.id)}>{n.data.title}</div>
+                ))}
+              </div>
+            ))}
+            <div className="side-sep" />
+            <div className="side-item disabled" title="Sắp có ở giai đoạn sau">📊 Báo cáo</div>
+            <div className="side-item disabled" title="Sắp có ở giai đoạn sau">⚙️ Cài đặt</div>
+          </nav>
+        )}
 
-      <div className="main">
+        <div className="content">
+          <div className="toolbar">
+            <span className="toolbar-label">Thêm node (nối vào node đang chọn):</span>
+            {Object.entries(TYPE_META).map(([k, m]) => <button key={k} onClick={() => addNode(k)}>{m.icon} {m.label}</button>)}
+            <span className="sep" />
+            <span className="toolbar-label">Lọc loại:</span>
+            {Object.entries(TYPE_META).map(([k, m]) => (
+              <label key={k} className="chk"><input type="checkbox" checked={!!typeFilter[k]} onChange={e => setTypeFilter(f => ({ ...f, [k]: e.target.checked }))} /> {m.label} ({counts[k] || 0})</label>
+            ))}
+            <span className="toolbar-spacer" />
+            <IconBtn icon="layout" label="Sắp xếp lại" onClick={relayout} />
+            <IconBtn icon="collapse" label="Thu gọn nhánh phụ" onClick={collapseAll} />
+            <IconBtn icon="save" label="Lưu bố cục" onClick={save} />
+            <IconBtn icon="reset" label="Đặt lại mẫu" onClick={reset} />
+          </div>
+
+          <div className="main">
         <div className="canvas">
           <ReactFlow
             nodes={visibleNodes} edges={visibleEdges}
@@ -535,7 +624,33 @@ function Flow() {
           )}
         </aside>
         )}
+          </div>
+        </div>
       </div>
+
+      {paletteOpen && (
+        <div className="palette-overlay" onClick={() => setPaletteOpen(false)}>
+          <div className="palette" onClick={e => e.stopPropagation()}>
+            <input autoFocus value={paletteQuery} onChange={e => setPaletteQuery(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') setPaletteOpen(false); if (e.key === 'Enter' && paletteNodes[0]) { jumpToNode(paletteNodes[0].id); setPaletteOpen(false); setPaletteQuery('') } }}
+              placeholder="Tìm node… (gõ không dấu cũng được, Enter để nhảy tới kết quả đầu)" />
+            <div className="palette-list">
+              <div className="palette-group">Lệnh</div>
+              <button className="palette-item" onClick={() => { setPaletteOpen(false); rf.fitView({ padding: 0.15, duration: 400 }) }}>🗺️ Xem toàn cảnh sơ đồ</button>
+              <button className="palette-item" onClick={() => { setPaletteOpen(false); relayout() }}>↗ Sắp xếp lại bố cục</button>
+              <button className="palette-item" onClick={() => { setPaletteOpen(false); collapseAll() }}>⊟ Thu gọn nhánh phụ</button>
+              {paletteNodes.length > 0 && <div className="palette-group">Node</div>}
+              {paletteNodes.map(n => (
+                <button key={n.id} className="palette-item" onClick={() => { jumpToNode(n.id); setPaletteOpen(false); setPaletteQuery('') }}>
+                  <span>{TYPE_META[n.data.type].icon}</span><span className="palette-item-title">{n.data.title}</span><span className="palette-item-type">{TYPE_META[n.data.type].label}</span>
+                </button>
+              ))}
+              {paletteQuery && paletteNodes.length === 0 && <div className="palette-empty">Không thấy node nào khớp.</div>}
+            </div>
+          </div>
+        </div>
+      )}
+
       <footer className="footer">Prototype thử cảm giác dùng — dữ liệu mẫu hư cấu, lưu cục bộ trong trình duyệt. Stack: React Flow (@xyflow/react) + Dagre auto-layout.</footer>
     </div>
   )
