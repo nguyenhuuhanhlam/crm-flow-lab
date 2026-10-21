@@ -287,7 +287,7 @@ function Flow() {
   useEffect(() => { setPanelTab('tongquan') }, [selectedId])
 
   // ----- Panel phải: thu gọn + kéo ngang đổi độ rộng (lưu localStorage) -----
-  const [panelW, setPanelW] = useState(() => { try { return JSON.parse(localStorage.getItem('crm-panel') || '{}').w || 330 } catch { return 330 } })
+  const [panelW, setPanelW] = useState(() => { try { return JSON.parse(localStorage.getItem('crm-panel') || '{}'  ).w || 440 } catch { return 440 } })
   const [panelCollapsed, setPanelCollapsed] = useState(() => { try { return !!JSON.parse(localStorage.getItem('crm-panel') || '{}').collapsed } catch { return false } })
   useEffect(() => { localStorage.setItem('crm-panel', JSON.stringify({ w: panelW, collapsed: panelCollapsed })) }, [panelW, panelCollapsed])
 
@@ -510,10 +510,11 @@ function Flow() {
   }), [nodes])
 
   // Tìm kiếm ở top menu (Astryx CommandPalette): CHỈ tìm tên Nhân viên và tên Công việc
-  // (không tìm công ty/bộ môn, không kèm lệnh — theo yêu cầu của user)
-  const paletteCommands = useMemo(() => nodes
-    .filter(n => n.data.type === 'employee' || n.data.type === 'task')
-    .map(n => ({ id: `node-${n.id}`, label: n.data.title })), [nodes])
+  // (không tìm công ty/bộ môn, không kèm lệnh) — ƯU TIÊN Công việc trước Nhân viên trong kết quả
+  const paletteCommands = useMemo(() => [
+    ...nodes.filter(n => n.data.type === 'task'),
+    ...nodes.filter(n => n.data.type === 'employee'),
+  ].map(n => ({ id: `node-${n.id}`, label: n.data.title })), [nodes])
   const paletteSource = useMemo(() => createStaticSource(paletteCommands), [paletteCommands])
 
   function handlePaletteSelect(id) {
@@ -653,9 +654,9 @@ function Flow() {
             </div>
           )}
           {panelCollapsed && (
-            <button className="panel-reopen" onClick={() => setPanelCollapsed(false)} title="Mở panel thông tin" aria-label="Mở panel thông tin">
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{ICONS.chevronLeft}</svg>
-            </button>
+            <div className="panel-reopen">
+              <IconBtn icon="chevronLeft" label="Mở panel thông tin" onClick={() => setPanelCollapsed(false)} />
+            </div>
           )}
         </div>
 
@@ -689,12 +690,12 @@ function Flow() {
               </div>
               <TabList value={panelTab} onChange={setPanelTab} role="tablist" layout="fill" size="sm" hasDivider>
                 {[['tongquan', 'Tổng quan'], ['chitiet', 'Chi tiết'], ['hoatdong', 'Hoạt động'], ['tailieu', 'Tài liệu']].map(([k, label]) => (
-                  <Tab key={k} value={k} label={label} />
+                  <Tab key={k} value={k} label={label} panelId={`paneltab-${k}`} />
                 ))}
               </TabList>
 
               {panelTab === 'tongquan' && (
-                <div>
+                <div role="tabpanel" id="paneltab-tongquan">
                   <Stack gap={3}>
                     <TextInput label="Tên / Tiêu đề" value={selected.data.title} onChange={v => updateSelected({ title: v })} />
                     <TextInput label="Dòng phụ" value={selected.data.subtitle} onChange={v => updateSelected({ subtitle: v })} />
@@ -720,7 +721,7 @@ function Flow() {
               )}
 
               {panelTab === 'chitiet' && (
-                <dl className="detail-list">
+                <dl className="detail-list" role="tabpanel" id="paneltab-chitiet">
                   {detailRows(selected).map(([k, v]) => (
                     <div key={k} className="detail-row"><dt>{k}</dt><dd>{v}</dd></div>
                   ))}
@@ -729,7 +730,7 @@ function Flow() {
               )}
 
               {panelTab === 'hoatdong' && (
-                <div className="activity-list">
+                <div className="activity-list" role="tabpanel" id="paneltab-hoatdong">
                   {activityRows(selected).map(([date, text]) => (
                     <div key={date + text} className="activity-row"><span className="activity-date">{date}</span><span>{text}</span></div>
                   ))}
@@ -738,7 +739,7 @@ function Flow() {
               )}
 
               {panelTab === 'tailieu' && (
-                <div className="doc-list">
+                <div className="doc-list" role="tabpanel" id="paneltab-tailieu">
                   {docRows(selected).map(([name, meta]) => (
                     <div key={name} className="doc-row"><span className="doc-icon">📄</span><span className="doc-main"><span className="doc-name">{name}</span><span className="doc-meta">{meta}</span></span><Button size="sm" label="Tải" onClick={() => alert('Tài liệu mẫu — chưa nối kho file thật.')} /></div>
                   ))}
