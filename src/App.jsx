@@ -291,7 +291,7 @@ function Flow() {
     if (focusSet) return focusSet.has(e.source) && focusSet.has(e.target)
     const s = decorated.find(n => n.id === e.source), t = decorated.find(n => n.id === e.target)
     return s && t && typeFilter[s.data.type] !== false && typeFilter[t.data.type] !== false && !s.hidden && !t.hidden
-  }).map(e => ({ ...e, labelStyle: { fontSize: 11, fill: dark ? '#cbd5e1' : '#64748b' } })), [edges, decorated, typeFilter, dark, focusSet])
+  }).map(e => ({ ...e, label: undefined })), [edges, decorated, typeFilter, focusSet])
 
   const selected = nodes.find(n => n.id === selectedId)
 
@@ -727,17 +727,6 @@ function Flow() {
                     <TextInput label="Giá trị / Thông tin chính" value={selected.data.value} onChange={v => updateSelected({ value: v })} />
                     <TextArea label="Ghi chú" value={selected.data.note} onChange={v => updateSelected({ note: v })} />
                   </Stack>
-                  <div className="panel-rel">
-                    <h4>Quan hệ của node này</h4>
-                    <Stack gap={1}>
-                      {edges.filter(e => e.source === selected.id || e.target === selected.id).map(e => {
-                        const otherId = e.source === selected.id ? e.target : e.source
-                        const other = nodes.find(n => n.id === otherId)
-                        return <Button key={e.id} variant="ghost" size="sm" label={`${e.label || 'liên quan'} → ${other?.data.title || otherId}`} onClick={() => other && setSelectedId(other.id)} />
-                      })}
-                    </Stack>
-                    {edges.every(e => e.source !== selected.id && e.target !== selected.id) && <p className="muted">Chưa có quan hệ nào.</p>}
-                  </div>
                   <div className="delete-wrap">
                     {selected.data.type === 'company'
                       ? <p className="muted">Node gốc (công ty) — không thể xóa.</p>

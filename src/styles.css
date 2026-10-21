@@ -29,7 +29,6 @@
 .panel { width: 330px; flex-shrink: 0; background: #fff; border-left: 1px solid #e2e8f0; padding: 16px; overflow-y: auto; }
 .panel-type { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
 .panel-empty h3 { margin-top: 0; } .panel-empty p, .panel-empty li { font-size: 13.5px; line-height: 1.55; color: #334155; }
-.panel-rel { margin-top: 18px; } .panel-rel h4 { margin: 0 0 8px; font-size: 13px; }
 .rel-item { display: block; width: 100%; text-align: left; margin-bottom: 6px; font-size: 12.5px; }
 .muted { color: #94a3b8; font-size: 13px; }
 .footer { padding: 7px 16px; font-size: 12px; color: #64748b; background: #fff; border-top: 1px solid #e2e8f0; }
