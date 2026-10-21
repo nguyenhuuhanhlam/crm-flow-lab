@@ -688,7 +688,7 @@ function Flow() {
                   ? <Button variant="destructive" label="✕ Thoát xem riêng" onClick={exitFocus} />
                   : <Button label="◎ Xem riêng node này" onClick={() => enterFocus(selected.id)} />}
               </div>
-              <TabList value={panelTab} onChange={setPanelTab} role="tablist" layout="fill" size="sm" hasDivider>
+              <TabList value={panelTab} onChange={setPanelTab} hasDivider>
                 {[['tongquan', 'Tổng quan'], ['chitiet', 'Chi tiết'], ['hoatdong', 'Hoạt động'], ['tailieu', 'Tài liệu']].map(([k, label]) => (
                   <Tab key={k} value={k} label={label} panelId={`paneltab-${k}`} />
                 ))}
