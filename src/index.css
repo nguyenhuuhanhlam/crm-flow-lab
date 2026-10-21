@@ -1,0 +1,7 @@
+/* Astryx UI — StyleX aggregation placeholder.
+ * Ensures Vite emits a CSS asset for StyleX-compiled styles.
+ * Theme tokens come from @astryxdesign/theme-neutral/theme.css.
+ */
+:root {
+  --stylex-injection: 0;
+}

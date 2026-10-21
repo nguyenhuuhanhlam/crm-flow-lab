@@ -5,16 +5,17 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import dagre from 'dagre'
-import { Theme } from '@astryxdesign/core'
+import { Theme } from '@astryxdesign/core/theme'
+import { neutralTheme } from '@astryxdesign/theme-neutral'
 import { AppShell } from '@astryxdesign/core/AppShell'
 import { Button } from '@astryxdesign/core/Button'
 import { CommandPalette } from '@astryxdesign/core/CommandPalette'
+import { Divider } from '@astryxdesign/core/Divider'
 import { DropdownMenu, DropdownMenuItem } from '@astryxdesign/core/DropdownMenu'
-import { Heading } from '@astryxdesign/core/Heading'
 import { HStack } from '@astryxdesign/core/HStack'
+import { Icon } from '@astryxdesign/core/Icon'
 import { IconButton } from '@astryxdesign/core/IconButton'
-import { Selector } from '@astryxdesign/core/Selector'
-import { SideNav } from '@astryxdesign/core/SideNav'
+import { SideNav, SideNavHeading } from '@astryxdesign/core/SideNav'
 import { Stack } from '@astryxdesign/core/Stack'
 import { Tab, TabList } from '@astryxdesign/core/TabList'
 import { Text } from '@astryxdesign/core/Text'
@@ -23,8 +24,8 @@ import { TextInput } from '@astryxdesign/core/TextInput'
 import { TopNav } from '@astryxdesign/core/TopNav'
 import { TreeList } from '@astryxdesign/core/TreeList'
 import { createStaticSource } from '@astryxdesign/core/Typeahead'
+import { Building2, ClipboardList, Folder, LogOut, Network, Search, ShieldCheck, User } from 'lucide-react'
 import { TYPE_META, initialNodesData, initialEdgesData } from './data'
-import { defaultThemeSlug, themes } from '../astryx-themes.js'
 
 // ---------- Auto-layout bằng Dagre (hierarchical, trái -> phải) ----------
 const NODE_W = 250, NODE_H = 92
@@ -105,15 +106,10 @@ let seq = 100
 function Flow() {
   const rf = useReactFlow()
   const [collapsedIds, setCollapsedIds] = useState(() => new Set(initialNodesData.filter(n => n.collapsed).map(n => n.id)))
-  const [query, setQuery] = useState('')
-  // ----- Khung shell kiểu NSDT: sidebar điều hướng + command palette -----
-  const [shellSide, setShellSide] = useState(() => { try { return JSON.parse(localStorage.getItem('crm-shell') || '{}').side !== false } catch { return true } })
-  const [foldersOpen, setFoldersOpen] = useState(() => { try { return JSON.parse(localStorage.getItem('crm-shell') || '{}').folders || { dept: true, emp: true, task: true } } catch { return { dept: true, emp: true, task: true } } })
-  useEffect(() => { localStorage.setItem('crm-shell', JSON.stringify({ side: shellSide, folders: foldersOpen })) }, [shellSide, foldersOpen])
+  // ----- Khung shell đúng mẫu Ahri App (Astryx ShellNav) + command palette -----
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [paletteQuery, setPaletteQuery] = useState('')
   useEffect(() => {
-    const onKey = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o) } }
+    const onKey = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(true) } }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
@@ -450,54 +446,59 @@ function Flow() {
   }
   const reset = () => { localStorage.removeItem('crm-node-proto-v5'); location.reload() }
 
-  const doSearch = () => {
-    const q = query.trim().toLowerCase(); if (!q) return
-    const hit = nodes.find(n => !n.hidden && n.data.title.toLowerCase().includes(q))
-    if (hit) { setSelectedId(hit.id); rf.fitView({ nodes: [{ id: hit.id }], padding: 0.6, duration: 500 }) }
-    else alert('Không thấy node đang hiển thị nào khớp. Thử mở thêm nhánh bằng nút ＋.')
-  }
-
   const sideGroups = useMemo(() => ({
     department: nodes.filter(n => n.data.type === 'department'),
     employee: nodes.filter(n => n.data.type === 'employee'),
     task: nodes.filter(n => n.data.type === 'task'),
   }), [nodes])
-  const paletteNodes = useMemo(() => {
-    const q = norm(paletteQuery.trim())
-    const all = [...nodes].sort((a, b) => (LEVELS[a.id] ?? 9) - (LEVELS[b.id] ?? 9))
-    return (q ? all.filter(n => norm(n.data.title).includes(q) || norm(n.data.subtitle).includes(q)) : all).slice(0, 12)
-  }, [nodes, paletteQuery])
 
-  // Command palette THẬT của Astryx: lệnh + mọi node (keywords không dấu)
-  const paletteSource = useMemo(() => createStaticSource([
-    { id: 'cmd-fit', label: 'Xem toàn cảnh sơ đồ', auxiliaryData: { kind: 'cmd', keywords: ['toan canh', 'so do'] } },
-    { id: 'cmd-layout', label: 'Sắp xếp lại bố cục', auxiliaryData: { kind: 'cmd', keywords: ['sap xep', 'bo cuc'] } },
-    { id: 'cmd-collapse', label: 'Thu gọn nhánh phụ', auxiliaryData: { kind: 'cmd', keywords: ['thu gon'] } },
-    ...nodes.map(n => ({ id: `node-${n.id}`, label: n.data.title, auxiliaryData: { kind: 'node', nodeId: n.id, keywords: [norm(n.data.title), norm(TYPE_META[n.data.type].label)] } })),
-  ], { keywords: (item) => item.auxiliaryData?.keywords ?? [] }), [nodes])
+  // Command palette của Astryx (đúng mẫu Ahri): lệnh + mọi node
+  const paletteCommands = useMemo(() => [
+    { id: 'cmd-fit', label: 'Xem toàn cảnh sơ đồ' },
+    { id: 'cmd-layout', label: 'Sắp xếp lại bố cục' },
+    { id: 'cmd-collapse', label: 'Thu gọn nhánh phụ' },
+    ...nodes.map(n => ({ id: `node-${n.id}`, label: n.data.title })),
+  ], [nodes])
+  const paletteSource = useMemo(() => createStaticSource(paletteCommands), [paletteCommands])
 
   function handlePaletteSelect(id) {
     if (!id) return
+    setPaletteOpen(false)
     if (id.startsWith('node-')) jumpToNode(id.slice(5))
     else if (id === 'cmd-fit') rf.fitView({ padding: 0.15, duration: 400 })
     else if (id === 'cmd-layout') relayout()
     else if (id === 'cmd-collapse') collapseAll()
-    setPaletteOpen(false)
   }
 
-  // Cây điều hướng cho TreeList của Astryx trong SideNav
+  // Cây điều hướng cho TreeList — cấu trúc nhóm + icon lucide đúng mẫu dashboard-shell của Ahri
+  const NODE_ICONS = { department: Building2, employee: User, task: ClipboardList }
   const treeItems = useMemo(() => {
     const group = (key, label, type) => ({
-      id: `g-${key}`, label: <Text maxLines={1}>{label}</Text>, isExpanded: true,
-      children: sideGroups[type].map(n => ({ id: `n-${n.id}`, label: <Text maxLines={1}>{n.data.title}</Text>, isSelected: selectedId === n.id, onClick: () => jumpToNode(n.id) })),
+      id: `g-${key}`,
+      label: <Text maxLines={1}>{label}</Text>,
+      startContent: <Icon icon={Folder} size="xsm" />,
+      isExpanded: true,
+      children: sideGroups[type].map(n => ({
+        id: `n-${n.id}`,
+        label: <Text maxLines={1}>{n.data.title}</Text>,
+        startContent: <Icon icon={NODE_ICONS[type]} size="xsm" />,
+        isSelected: selectedId === n.id,
+        onClick: () => jumpToNode(n.id),
+      })),
     })
     return [
-      { id: 'nav-graph', label: <Text maxLines={1}>Sơ đồ quan hệ</Text>, isSelected: true, onClick: () => rf.fitView({ padding: 0.15, duration: 400 }) },
-      group('dept', 'Bộ môn', 'department'),
-      group('emp', 'Nhân viên', 'employee'),
+      {
+        id: 'g-overview',
+        label: <Text maxLines={1}>Tổng quan</Text>,
+        startContent: <Icon icon={Folder} size="xsm" />,
+        isExpanded: true,
+        children: [
+          { id: 'nav-graph', label: <Text maxLines={1}>Sơ đồ quan hệ</Text>, startContent: <Icon icon={Network} size="xsm" />, isSelected: true, onClick: () => rf.fitView({ padding: 0.15, duration: 400 }) },
+        ],
+      },
+      group('dept', 'Tổ chức', 'department'),
+      group('emp', 'Nhân sự', 'employee'),
       group('task', 'Công việc', 'task'),
-      { id: 'nav-report', label: <Text maxLines={1}>Báo cáo (sắp có)</Text>, isDisabled: true },
-      { id: 'nav-settings', label: <Text maxLines={1}>Cài đặt (sắp có)</Text>, isDisabled: true },
     ]
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sideGroups, selectedId])
@@ -507,44 +508,67 @@ function Flow() {
   }, [nodes])
 
   return (
-    <Theme theme={themes[defaultThemeSlug]} mode={themeMode}>
+    <Theme theme={neutralTheme} mode={themeMode}>
     <div className={`app ${dark ? 'dark' : ''}`}>
       <AppShell
-        height="fill"
-        contentPadding={0}
+        contentPadding={4}
         topNav={(
           <TopNav
-            label="Thanh điều hướng chính"
-            heading={(
-              <HStack gap={2} align="center">
-                <IconButton label={shellSide ? 'Ẩn thanh điều hướng' : 'Hiện thanh điều hướng'} variant="ghost" onClick={() => setShellSide(s => !s)}
-                  icon={<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>} />
-                <Heading level={4}>CRM Miền Tây</Heading>
-              </HStack>
-            )}
-            centerContent={(
-              <Stack onClick={() => setPaletteOpen(true)}>
-                <TextInput label="Tìm kiếm" isLabelHidden placeholder="Tìm node hoặc lệnh (Ctrl+K)" value="" onChange={() => {}} isReadOnly startIcon="search" width={340} />
-              </Stack>
+            label="Thanh menu ứng dụng"
+            startContent={(
+              <DropdownMenu
+                button={{ label: 'Tài khoản', variant: 'ghost', size: 'sm' }}
+                hasChevron={false}
+                menuWidth={280}
+              >
+                <DropdownMenuItem
+                  label="Quản trị viên"
+                  description="admin@mientay.example"
+                  icon={<Icon icon={ShieldCheck} size="xsm" />}
+                />
+                <Divider />
+                <DropdownMenuItem label={`Giao diện: Theo hệ thống${themeMode === 'system' ? ' ✓' : ''}`} onClick={() => setThemeMode('system')} />
+                <DropdownMenuItem label={`Giao diện: Sáng${themeMode === 'light' ? ' ✓' : ''}`} onClick={() => setThemeMode('light')} />
+                <DropdownMenuItem label={`Giao diện: Tối${themeMode === 'dark' ? ' ✓' : ''}`} onClick={() => setThemeMode('dark')} />
+                <Divider />
+                <DropdownMenuItem
+                  label="Đăng xuất"
+                  icon={<Icon icon={LogOut} size="xsm" />}
+                  onClick={() => {}}
+                />
+              </DropdownMenu>
             )}
             endContent={(
-              <HStack gap={2} align="center">
-                <Selector label="Giao diện" isLabelHidden width={150}
-                  options={[{ value: 'system', label: 'Theo hệ thống' }, { value: 'light', label: 'Sáng' }, { value: 'dark', label: 'Tối' }]}
-                  value={themeMode} onChange={setThemeMode} />
-                <DropdownMenu trigger={<Button variant="ghost" label="Tài khoản">Tài khoản</Button>}>
-                  <DropdownMenuItem label="Quản trị viên" description="admin@mientay.example" />
-                  <DropdownMenuItem label="Đăng xuất" onClick={() => {}} />
-                </DropdownMenu>
-              </HStack>
+              <Stack onClick={() => setPaletteOpen(true)}>
+                <TextInput
+                  label="Tìm kiếm node và lệnh"
+                  isLabelHidden
+                  size="sm"
+                  width={240}
+                  startIcon={Search}
+                  placeholder="Tìm kiếm node và lệnh…"
+                  value=""
+                  onChange={() => {}}
+                />
+              </Stack>
             )}
           />
         )}
-        sideNav={shellSide ? (
-          <SideNav label="Điều hướng chính" resizable={{ defaultWidth: 248, minWidth: 180, maxWidth: 400 }}>
+        sideNav={(
+          <SideNav
+            label="Điều hướng ứng dụng"
+            resizable={{ defaultWidth: 240, minWidth: 180, maxWidth: 400 }}
+            header={
+              <SideNavHeading
+                icon={<Network size={18} />}
+                heading="CRM Miền Tây"
+                superheading="Sơ đồ quan hệ"
+              />
+            }
+          >
             <TreeList items={treeItems} density="compact" />
           </SideNav>
-        ) : undefined}
+        )}
       >
         <div className="content">
           <div className="toolbar">
@@ -686,8 +710,7 @@ function Flow() {
         isOpen={paletteOpen}
         onOpenChange={setPaletteOpen}
         searchSource={paletteSource}
-        label="Tìm node hoặc lệnh"
-        emptySearchText="Không tìm thấy node hay lệnh nào"
+        label="Tìm kiếm node và lệnh"
         onValueChange={handlePaletteSelect}
       />
     </div>
