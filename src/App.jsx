@@ -163,6 +163,8 @@ function Flow() {
   // Trạng thái Xem riêng — PHẢI khai báo trước mọi useMemo dùng tới (decorated, visibleNodes...)
   const [focusId, setFocusId] = useState(null)
   const focusBackup = useRef(null)
+  // Node bổ sung khi Xem riêng theo NHÁNH (vào từ sidebar tổ chức): công việc của các nhân viên trong nhánh
+  const [focusExtra, setFocusExtra] = useState(null)
 
   // Tập node khi Xem riêng: node + quan hệ trực tiếp + chuỗi cấp trên (đi ngược quan hệ chính)
   const computeFocusSet = useCallback((id) => {
@@ -182,7 +184,12 @@ function Flow() {
     return s
   }, [edges])
 
-  const focusSet = useMemo(() => (focusId ? computeFocusSet(focusId) : null), [focusId, computeFocusSet])
+  const focusSet = useMemo(() => {
+    if (!focusId) return null
+    const s = computeFocusSet(focusId)
+    if (focusExtra) focusExtra.forEach(x => s.add(x))
+    return s
+  }, [focusId, computeFocusSet, focusExtra])
 
   // Gắn cờ hasHidden / canCollapse + handler gạt mở-thu vào data của từng node
   const decorated = useMemo(() => nodes.map(n => {
@@ -276,12 +283,20 @@ function Flow() {
   const [panelCollapsed, setPanelCollapsed] = useState(() => { try { return !!JSON.parse(localStorage.getItem('crm-panel') || '{}').collapsed } catch { return false } })
   useEffect(() => { localStorage.setItem('crm-panel', JSON.stringify({ w: panelW, collapsed: panelCollapsed })) }, [panelW, panelCollapsed])
 
-  function enterFocus(id) {
+  function enterFocus(id, branch = false) {
     if (!focusId) {
       focusBackup.current = { positions: Object.fromEntries(nodes.map(n => [n.id, n.position])), collapsedIds: new Set(collapsedIds) }
     }
+    // Xem riêng theo nhánh (bấm tổ chức ở sidebar): kèm thêm công việc của từng nhân viên trong nhánh
+    const extra = new Set()
+    if (branch) {
+      const children = (x) => edges.filter(e => e.target === x && !e.secondary).map(e => e.source)
+      children(id).forEach(c => children(c).forEach(g => extra.add(g)))
+    }
+    setFocusExtra(branch ? extra : null)
     setFocusId(id); setSelectedId(id); setPanelCollapsed(false)
     const set = computeFocusSet(id)
+    extra.forEach(x => set.add(x))
     setNodes(ns => {
       const sub = ns.filter(n => set.has(n.id)).map(n => ({ ...n, hidden: false }))
       const laid = layout(sub, edges.filter(e => set.has(e.source) && set.has(e.target)))
@@ -298,6 +313,7 @@ function Flow() {
       setNodes(ns => ns.map(n => ({ ...n, position: b.positions[n.id] ?? n.position, hidden: b.collapsedIds.has(n.id) })))
       focusBackup.current = null
     }
+    setFocusExtra(null)
     setFocusId(null)
     setTimeout(() => rf.fitView({ padding: 0.15, duration: 400 }), 60)
   }
@@ -323,6 +339,7 @@ function Flow() {
     if (focusId) {
       const b = focusBackup.current
       if (b) { baseCollapsed = b.collapsedIds; basePositions = b.positions; focusBackup.current = null }
+      setFocusExtra(null)
       setFocusId(null)
     }
     const chain = ancestorChain(id)
@@ -339,35 +356,13 @@ function Flow() {
     if (pos) setTimeout(() => rf.setCenter(pos.x + 125, pos.y + 45, { zoom: 1.05, duration: 500 }), 80)
   }
 
-  // Bấm 1 tổ chức ở sidebar: tự tách nhánh đó ra xem chi tiết —
-  // mở toàn bộ nhánh (nhân viên + công việc của nhân viên), thu các nhánh tổ chức khác, khung hình vào nhánh
-  function openBranch(deptId) {
-    let basePositions = null
-    if (focusId) {
-      const b = focusBackup.current
-      if (b) { basePositions = b.positions; focusBackup.current = null }
-      setFocusId(null)
-    }
-    const children = (id) => edges.filter(e => e.target === id && !e.secondary).map(e => e.source)
-    const branch = new Set([deptId])
-    children(deptId).forEach(e1 => { branch.add(e1); children(e1).forEach(t => branch.add(t)) })
-    const next = new Set(nodes.filter(n => n.data.type === 'department' && n.id !== deptId).map(n => n.id))
-    setCollapsedIds(next)
-    setNodes(ns => ns.map(n => ({
-      ...n,
-      position: basePositions?.[n.id] ?? n.position,
-      hidden: ancestorChain(n.id).some(a => next.has(a)),
-    })))
-    setSelectedId(deptId); setPanelCollapsed(false)
-    setTimeout(() => rf.fitView({ nodes: [...branch].map(id => ({ id })), padding: 0.25, duration: 500 }), 80)
-  }
-
-  // Bấm "Sơ đồ quan hệ" ở sidebar: về tổng quan — thu mọi nhánh tổ chức, hiện công ty + các tổ chức
+  // Bấm "Sơ đồ quan hệ" ở sidebar: về tổng quan — thoát Xem riêng nếu đang bật, thu mọi nhánh tổ chức
   function resetOverview() {
     let basePositions = null
     if (focusId) {
       const b = focusBackup.current
       if (b) { basePositions = b.positions; focusBackup.current = null }
+      setFocusExtra(null)
       setFocusId(null)
     }
     const next = new Set(nodes.filter(n => n.data.type === 'department').map(n => n.id))
@@ -534,7 +529,7 @@ function Flow() {
         label: <Text maxLines={1}>{n.data.title}</Text>,
         startContent: <Icon icon={Building2} size="xsm" />,
         isSelected: selectedId === n.id,
-        onClick: () => openBranch(n.id),
+        onClick: () => enterFocus(n.id, true),
       })),
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -638,7 +633,7 @@ function Flow() {
           </ReactFlow>
           {focusId && (
             <div className="focus-banner">
-              <span>Đang xem riêng: <b>{nodes.find(n => n.id === focusId)?.data.title}</b> — chỉ hiện node này, các quan hệ trực tiếp và chuỗi cấp trên</span>
+              <span>Đang xem riêng: <b>{nodes.find(n => n.id === focusId)?.data.title}</b> — chỉ hiện nhánh này cùng các quan hệ trực tiếp và chuỗi cấp trên</span>
               <button onClick={exitFocus}>Thoát xem riêng</button>
             </div>
           )}
