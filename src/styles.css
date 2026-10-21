@@ -77,10 +77,6 @@
 .app.dark .topbar, .app.dark .toolbar, .app.dark .panel, .app.dark .footer { background: #0f172a; border-color: #1e293b; }
 .app.dark .topbar p, .app.dark .footer { color: #94a3b8; }
 .app.dark .toolbar-label, .app.dark .theme-select, .app.dark .panel label { color: #94a3b8; }
-.app.dark button { background: #1e293b; border-color: #334155; color: #e2e8f0; }
-.app.dark button:hover { background: #334155; }
-.app.dark button.danger { color: #fca5a5; border-color: #7f1d1d; }
-.app.dark .top-actions input, .app.dark .panel input, .app.dark .panel textarea, .app.dark .theme-select select { background: #1e293b; border-color: #334155; color: #e2e8f0; }
 .app.dark .sep { background: #1e293b; }
 .app.dark .panel-empty p, .app.dark .panel-empty li { color: #cbd5e1; }
 .app.dark .crm-node { box-shadow: 0 1px 4px rgba(0,0,0,.5); }
