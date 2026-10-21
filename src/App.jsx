@@ -26,10 +26,13 @@ import { TextInput } from '@astryxdesign/core/TextInput'
 import { TopNav } from '@astryxdesign/core/TopNav'
 import { TreeList } from '@astryxdesign/core/TreeList'
 import { createStaticSource } from '@astryxdesign/core/Typeahead'
-import { Building2, ChevronLeft, ChevronRight, ClipboardList, Factory, FileText, Focus, Folder, LayoutGrid, LogOut, Minimize2, Network, RotateCcw, Save, Search, ShieldCheck, User, X } from 'lucide-react'
+import { ArrowLeftRight, Building2, ChevronLeft, ChevronRight, ClipboardList, Factory, FileText, Focus, Folder, LayoutGrid, LogOut, Minimize2, Network, RotateCcw, Save, Search, ShieldCheck, User, X } from 'lucide-react'
 import { TYPE_META, initialNodesData, initialEdgesData } from './data'
 
 // ---------- Auto-layout bằng Dagre (hierarchical, trái -> phải) ----------
+// Chiều mở rộng của cây: 'right' = gốc bên trái, mở sang phải (rankdir RL vì edge đi từ con lên cha);
+// 'left' = gốc bên phải, mở sang trái (rankdir LR)
+const rankFor = (d) => (d === 'right' ? 'RL' : 'LR')
 const NODE_W = 250, NODE_H = 92
 function layout(nodes, edges, direction = 'RL') {
   const g = new dagre.graphlib.Graph()
@@ -64,7 +67,7 @@ function CrmNode({ id, data, selected }) {
   const accent = data.dark ? meta.darkColor : meta.color
   return (
     <div className={`crm-node crm-node-${data.type} ${selected ? 'selected' : ''}`} style={{ background: data.dark ? meta.darkBg : meta.bg, borderColor: selected ? accent : (data.dark ? meta.darkBorder : meta.border) }}>
-      <Handle type="target" position={Position.Right} />
+      <Handle type="target" position={data.flip ? Position.Left : Position.Right} />
       <div className="crm-node-head">
         <span className="crm-node-icon">{(() => { const TypeIcon = TYPE_ICONS[data.type]; return <TypeIcon size={15} color={accent} strokeWidth={2.2} /> })()}</span>
         <span className="crm-node-type" style={{ color: accent }}>{meta.label}</span>
@@ -87,7 +90,7 @@ function CrmNode({ id, data, selected }) {
           <span className="crm-node-value">{data.value}</span>
         </div>
       )}
-      <Handle type="source" position={Position.Left} />
+      <Handle type="source" position={data.flip ? Position.Right : Position.Left} />
     </div>
   )
 }
@@ -99,6 +102,7 @@ const norm = (s) => (s || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCas
 const ICONS = {
   search: Search,
   layout: LayoutGrid,
+  flip: ArrowLeftRight,
   collapse: Minimize2,
   save: Save,
   reset: RotateCcw,
@@ -147,6 +151,9 @@ function Flow() {
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [dir, setDir] = useState(() => { try { return localStorage.getItem('crm-dir') || 'right' } catch { return 'right' } })
+  useEffect(() => { try { localStorage.setItem('crm-dir', dir) } catch { /* bỏ qua */ } }, [dir])
+  const layoutDir = (ns, es) => layout(ns, es, rankFor(dir))
   const initDone = useRef(false)
 
   // Chặn xóa bằng phím Delete/Backspace trên canvas đối với node quan trọng (công ty, bộ môn):
@@ -174,7 +181,7 @@ function Flow() {
       if (saved.extraNodes) ns = [...ns, ...saved.extraNodes]
       if (saved.extraEdges) es = [...es, ...saved.extraEdges]
     } else {
-      ns = layout(ns.filter(n => !n.hidden), es).concat(ns.filter(n => n.hidden).map(n => ({ ...n, position: { x: 60, y: 60 } })))
+      ns = layoutDir(ns.filter(n => !n.hidden), es).concat(ns.filter(n => n.hidden).map(n => ({ ...n, position: { x: 60, y: 60 } })))
       // giữ hidden cho các node thu gọn sau layout
       ns = ns.map(n => ({ ...n, hidden: hidden.has(n.id) }))
     }
@@ -226,9 +233,9 @@ function Flow() {
       const otherNode = nodes.find(x => x.id === other)
       if (otherNode && !collapsedIds.has(other) && (otherNode.data.level ?? 1) > myLevel) canCollapse = true
     })
-    return { ...n, deletable: n.data.type !== 'company' && n.data.type !== 'department', data: { ...n.data, dark, focusMode: !!focusId, hasHidden: neighbourHidden, canCollapse, onToggle: (id) => toggleNode(id) } }
+    return { ...n, deletable: n.data.type !== 'company' && n.data.type !== 'department', data: { ...n.data, dark, flip: dir === 'left', focusMode: !!focusId, hasHidden: neighbourHidden, canCollapse, onToggle: (id) => toggleNode(id) } }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [nodes, edges, collapsedIds, dark, focusId])
+  }), [nodes, edges, collapsedIds, dark, focusId, dir])
 
   function expandFrom(id) {
     const next = new Set(collapsedIds)
@@ -241,7 +248,7 @@ function Flow() {
     setCollapsedIds(next)
     setNodes(ns => {
       const vis = ns.map(n => ({ ...n, hidden: next.has(n.id) }))
-      const laid = layout(vis.filter(n => !n.hidden), edges)
+      const laid = layoutDir(vis.filter(n => !n.hidden), edges)
       const byId = Object.fromEntries(laid.map(n => [n.id, n]))
       return vis.map(n => byId[n.id] ? { ...n, position: byId[n.id].position } : n)
     })
@@ -332,7 +339,7 @@ function Flow() {
     extra.forEach(x => set.add(x))
     setNodes(ns => {
       const sub = ns.filter(n => set.has(n.id)).map(n => ({ ...n, hidden: false }))
-      const laid = layout(sub, edges.filter(e => set.has(e.source) && set.has(e.target)))
+      const laid = layoutDir(sub, edges.filter(e => set.has(e.source) && set.has(e.target)))
       const byId = Object.fromEntries(laid.map(n => [n.id, n]))
       return ns.map(n => byId[n.id] ? { ...n, position: byId[n.id].position } : n)
     })
@@ -498,13 +505,13 @@ function Flow() {
     setSelectedId(null)
   }
 
-  const relayout = () => {
-    // Đang Xem riêng: CHỈ sắp xếp trong tập node đang xem (như lúc vào focus),
-    // không layout lại toàn đồ thị — layout toàn cục làm các node đang hiện nhảy vị trí lung tung
+  // Sắp xếp lại theo 1 rankdir cho trước. Đang Xem riêng thì CHỈ sắp xếp trong tập node đang xem
+  // (như lúc vào focus), không layout lại toàn đồ thị — tránh các node đang hiện nhảy vị trí lung tung
+  const applyLayout = (rank) => {
     if (focusSet) {
       setNodes(ns => {
         const sub = ns.filter(n => focusSet.has(n.id)).map(n => ({ ...n, hidden: false }))
-        const laid = layout(sub, edges.filter(e => focusSet.has(e.source) && focusSet.has(e.target)))
+        const laid = layout(sub, edges.filter(e => focusSet.has(e.source) && focusSet.has(e.target)), rank)
         const byId = Object.fromEntries(laid.map(n => [n.id, n]))
         return ns.map(n => byId[n.id] ? { ...n, position: byId[n.id].position } : n)
       })
@@ -513,11 +520,19 @@ function Flow() {
     }
     setNodes(ns => {
       const vis = ns.filter(n => !n.hidden)
-      const laid = layout(vis, edges)
+      const laid = layout(vis, edges, rank)
       const byId = Object.fromEntries(laid.map(n => [n.id, n]))
       return ns.map(n => byId[n.id] ? { ...n, position: byId[n.id].position } : n)
     })
     setTimeout(() => rf.fitView({ padding: 0.15, duration: 400 }), 60)
+  }
+  const relayout = () => applyLayout(rankFor(dir))
+
+  // Đổi chiều mở rộng của cây: phải <-> trái, sắp xếp lại ngay theo chiều mới (tôn trọng Xem riêng)
+  const flipDirection = () => {
+    const nd = dir === 'right' ? 'left' : 'right'
+    setDir(nd)
+    applyLayout(rankFor(nd))
   }
 
   const save = () => {
@@ -654,6 +669,7 @@ function Flow() {
               <Button key={k} size="sm" variant={typeFilter[k] ? 'primary' : 'secondary'} label={`${m.label} (${counts[k] || 0})`} onClick={() => setTypeFilter(f => ({ ...f, [k]: !f[k] }))} />
             ))}
             <span className="toolbar-spacer" />
+            <IconBtn icon="flip" label={dir === 'right' ? 'Đổi chiều: đang mở sang phải, bấm để mở sang trái' : 'Đổi chiều: đang mở sang trái, bấm để mở sang phải'} onClick={flipDirection} />
             <IconBtn icon="layout" label="Sắp xếp lại" onClick={relayout} />
             <IconBtn icon="collapse" label="Thu gọn nhánh phụ" onClick={collapseAll} />
             <IconBtn icon="save" label="Lưu bố cục" onClick={save} />
