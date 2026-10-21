@@ -67,7 +67,8 @@ function CrmNode({ id, data, selected }) {
   const accent = data.dark ? meta.darkColor : meta.color
   return (
     <div className={`crm-node crm-node-${data.type} ${selected ? 'selected' : ''}`} style={{ background: data.dark ? meta.darkBg : meta.bg, borderColor: selected ? accent : (data.dark ? meta.darkBorder : meta.border) }}>
-      <Handle type="target" position={data.flip ? Position.Left : Position.Right} />
+      <Handle type="source" id="s-left" position={Position.Left} />
+      <Handle type="target" id="t-left" position={Position.Left} />
       <div className="crm-node-head">
         <span className="crm-node-icon">{(() => { const TypeIcon = TYPE_ICONS[data.type]; return <TypeIcon size={15} color={accent} strokeWidth={2.2} /> })()}</span>
         <span className="crm-node-type" style={{ color: accent }}>{meta.label}</span>
@@ -90,7 +91,8 @@ function CrmNode({ id, data, selected }) {
           <span className="crm-node-value">{data.value}</span>
         </div>
       )}
-      <Handle type="source" position={data.flip ? Position.Right : Position.Left} />
+      <Handle type="source" id="s-right" position={Position.Right} />
+      <Handle type="target" id="t-right" position={Position.Right} />
     </div>
   )
 }
@@ -300,7 +302,20 @@ function Flow() {
     if (focusSet) return focusSet.has(e.source) && focusSet.has(e.target)
     const s = decorated.find(n => n.id === e.source), t = decorated.find(n => n.id === e.target)
     return s && t && typeFilter[s.data.type] !== false && typeFilter[t.data.type] !== false && !s.hidden && !t.hidden
-  }).map(e => ({ ...e, label: undefined })), [edges, decorated, typeFilter, focusSet])
+  }).map(e => {
+    if (e.customHandles && e.sourceHandle && e.targetHandle) return { ...e, label: undefined }
+    // Phía nối mặc định: node con quay mặt về cha, node cha quay mặt về con — theo chiều bố cục hiện tại
+    const sl = decorated.find(n => n.id === e.source)?.data.level ?? 1
+    const tl = decorated.find(n => n.id === e.target)?.data.level ?? 1
+    const childSide = dir === 'right' ? 'left' : 'right'
+    const parentSide = dir === 'right' ? 'right' : 'left'
+    const sourceIsChild = sl >= tl
+    return {
+      ...e, label: undefined,
+      sourceHandle: `s-${sourceIsChild ? childSide : parentSide}`,
+      targetHandle: `t-${sourceIsChild ? parentSide : childSide}`,
+    }
+  }), [edges, decorated, typeFilter, focusSet, dir])
 
   const selected = nodes.find(n => n.id === selectedId)
 
@@ -476,7 +491,7 @@ function Flow() {
     return [['Hồ sơ nhân viên.pdf', 'PDF • 940 KB • 04-01-2021'], ['Chứng chỉ thí nghiệm viên.pdf', 'PDF • 410 KB • 18-06-2023'], ['Hợp đồng lao động.pdf', 'PDF • 620 KB • 04-01-2021']]
   }
 
-  const onConnect = useCallback((params) => setEdges(es => addEdge({ ...params, label: 'liên quan', style: { stroke: '#94a3b8' } }, es)), [setEdges])
+  const onConnect = useCallback((params) => setEdges(es => addEdge({ ...params, customHandles: true, label: 'liên quan', style: { stroke: '#94a3b8' } }, es)), [setEdges])
 
   const updateSelected = (patch) => {
     setNodes(ns => ns.map(n => n.id === selectedId ? { ...n, data: { ...n.data, ...patch } } : n))
