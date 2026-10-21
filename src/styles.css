@@ -42,12 +42,14 @@
 .app.dark .badge-concurrent { color: #fbbf24; background: #451a03; border-color: #b45309; }
 .crm-node-type { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .expand-btn { margin-left: auto; width: 22px; height: 22px; padding: 0; border-radius: 999px; line-height: 1; font-size: 14px; background: #0f172a; color: #fff; border: none; }
-.crm-node-title { font-size: 14px; font-weight: 700; margin-top: 5px; line-height: 1.3; }
-.crm-node-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+.crm-node-title { font-size: 14px; font-weight: 700; margin-top: 5px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crm-node-sub { font-size: 12px; color: #64748b; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Riêng node Công việc: tiêu đề được tối đa 3 dòng, quá 3 dòng mới cắt ... */
+.crm-node-task .crm-node-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .crm-node-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
 .status-cell { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
 .badge { font-size: 11px; font-weight: 600; border: 1px solid; border-radius: 999px; padding: 2px 7px; white-space: nowrap; }
-.crm-node-value { font-size: 11.5px; color: #475569; text-align: right; }
+.crm-node-value { font-size: 11.5px; color: #475569; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .react-flow__handle { width: 10px; height: 10px; }
 .icon-btn { width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 /* Panel tabs */

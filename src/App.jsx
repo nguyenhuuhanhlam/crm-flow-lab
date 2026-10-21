@@ -61,7 +61,7 @@ function CrmNode({ id, data, selected }) {
   const meta = TYPE_META[data.type]
   const accent = data.dark ? meta.darkColor : meta.color
   return (
-    <div className={`crm-node ${selected ? 'selected' : ''}`} style={{ background: data.dark ? meta.darkBg : meta.bg, borderColor: selected ? accent : (data.dark ? meta.darkBorder : meta.border) }}>
+    <div className={`crm-node crm-node-${data.type} ${selected ? 'selected' : ''}`} style={{ background: data.dark ? meta.darkBg : meta.bg, borderColor: selected ? accent : (data.dark ? meta.darkBorder : meta.border) }}>
       <Handle type="target" position={Position.Left} />
       <div className="crm-node-head">
         <span className="crm-node-icon">{meta.icon}</span>
@@ -71,8 +71,8 @@ function CrmNode({ id, data, selected }) {
           <button className="expand-btn nodrag" title={data.hasHidden ? 'Mở nhánh tại node này' : 'Thu gọn nhánh tại node này'} onClick={(e) => { e.stopPropagation(); data.onToggle(id) }}>{data.hasHidden ? '＋' : '−'}</button>
         ) : null}
       </div>
-      <div className="crm-node-title">{data.title}</div>
-      <div className="crm-node-sub">{data.subtitle}</div>
+      <div className="crm-node-title" title={data.title}>{data.title}</div>
+      <div className="crm-node-sub" title={data.subtitle}>{data.subtitle}</div>
       {data.type === 'employee' ? (
         // Thẻ nhân viên chỉ giữ thông tin cần thiết: bỏ email, trạng thái "Đang làm việc" thu còn 1 ô màu xanh
         // (đã nghỉ việc = ô xám; rê chuột vào ô xem chữ trạng thái). Email vẫn xem đầy đủ ở panel chi tiết.
@@ -509,22 +509,17 @@ function Flow() {
     task: nodes.filter(n => n.data.type === 'task'),
   }), [nodes])
 
-  // Command palette của Astryx (đúng mẫu Ahri): lệnh + mọi node
-  const paletteCommands = useMemo(() => [
-    { id: 'cmd-fit', label: 'Xem toàn cảnh sơ đồ' },
-    { id: 'cmd-layout', label: 'Sắp xếp lại bố cục' },
-    { id: 'cmd-collapse', label: 'Thu gọn nhánh phụ' },
-    ...nodes.map(n => ({ id: `node-${n.id}`, label: n.data.title })),
-  ], [nodes])
+  // Tìm kiếm ở top menu (Astryx CommandPalette): CHỈ tìm tên Nhân viên và tên Công việc
+  // (không tìm công ty/bộ môn, không kèm lệnh — theo yêu cầu của user)
+  const paletteCommands = useMemo(() => nodes
+    .filter(n => n.data.type === 'employee' || n.data.type === 'task')
+    .map(n => ({ id: `node-${n.id}`, label: n.data.title })), [nodes])
   const paletteSource = useMemo(() => createStaticSource(paletteCommands), [paletteCommands])
 
   function handlePaletteSelect(id) {
     if (!id) return
     setPaletteOpen(false)
     if (id.startsWith('node-')) jumpToNode(id.slice(5))
-    else if (id === 'cmd-fit') rf.fitView({ padding: 0.15, duration: 400 })
-    else if (id === 'cmd-layout') relayout()
-    else if (id === 'cmd-collapse') collapseAll()
   }
 
   // Cây điều hướng cho TreeList — chỉ còn Tổng quan + Tổ chức (theo yêu cầu: bỏ menu Nhân sự / Công việc;
@@ -593,12 +588,12 @@ function Flow() {
             endContent={(
               <Stack onClick={() => setPaletteOpen(true)}>
                 <TextInput
-                  label="Tìm kiếm node và lệnh"
+                  label="Tìm nhân viên, công việc"
                   isLabelHidden
                   size="sm"
                   width={240}
                   startIcon={Search}
-                  placeholder="Tìm kiếm node và lệnh…"
+                  placeholder="Tìm nhân viên, công việc…"
                   value=""
                   onChange={() => {}}
                 />
@@ -762,7 +757,7 @@ function Flow() {
         isOpen={paletteOpen}
         onOpenChange={setPaletteOpen}
         searchSource={paletteSource}
-        label="Tìm kiếm node và lệnh"
+        label="Tìm nhân viên, công việc"
         onValueChange={handlePaletteSelect}
       />
     </div>
