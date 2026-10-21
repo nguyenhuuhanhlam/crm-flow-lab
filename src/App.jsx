@@ -10,7 +10,9 @@ import { neutralTheme } from '@astryxdesign/theme-neutral'
 import { AppShell } from '@astryxdesign/core/AppShell'
 import { Button } from '@astryxdesign/core/Button'
 import { CommandPalette } from '@astryxdesign/core/CommandPalette'
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { Divider } from '@astryxdesign/core/Divider'
+import { Heading } from '@astryxdesign/core/Heading'
 import { DropdownMenu, DropdownMenuItem } from '@astryxdesign/core/DropdownMenu'
 import { HStack } from '@astryxdesign/core/HStack'
 import { Icon } from '@astryxdesign/core/Icon'
@@ -145,6 +147,17 @@ function Flow() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const initDone = useRef(false)
 
+  // Chặn xóa bằng phím Delete/Backspace trên canvas đối với node quan trọng (công ty, bộ môn):
+  // các node này chỉ xóa được qua panel — bộ môn còn phải gõ xác nhận, công ty thì không bao giờ
+  const handleNodesChange = (changes) => {
+    const safe = changes.filter(c => {
+      if (c.type !== 'remove') return true
+      const n = nodes.find(x => x.id === c.id)
+      return !n || (n.data.type !== 'company' && n.data.type !== 'department')
+    })
+    onNodesChange(safe)
+  }
+
   // Khởi tạo + auto-layout lần đầu, khôi phục vị trí đã lưu nếu có
   useEffect(() => {
     if (initDone.current) return
@@ -211,7 +224,7 @@ function Flow() {
       const otherNode = nodes.find(x => x.id === other)
       if (otherNode && !collapsedIds.has(other) && (otherNode.data.level ?? 1) > myLevel) canCollapse = true
     })
-    return { ...n, data: { ...n.data, dark, focusMode: !!focusId, hasHidden: neighbourHidden, canCollapse, onToggle: (id) => toggleNode(id) } }
+    return { ...n, deletable: n.data.type !== 'company' && n.data.type !== 'department', data: { ...n.data, dark, focusMode: !!focusId, hasHidden: neighbourHidden, canCollapse, onToggle: (id) => toggleNode(id) } }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [nodes, edges, collapsedIds, dark, focusId])
 
@@ -284,6 +297,16 @@ function Flow() {
 
   // ----- Panel phải dạng tabs: Tổng quan / Chi tiết / Hoạt động / Tài liệu -----
   const [panelTab, setPanelTab] = useState('tongquan')
+  const [delOpen, setDelOpen] = useState(false)
+  const [delText, setDelText] = useState('')
+  // Xóa node: công ty (node gốc) không bao giờ xóa; bộ môn phải gõ lại đúng tên trong dialog xác nhận;
+  // nhân viên / công việc xóa ngay như cũ
+  const requestDelete = () => {
+    if (!selected) return
+    if (selected.data.type === 'company') return
+    if (selected.data.type === 'department') { setDelText(''); setDelOpen(true); return }
+    deleteSelected()
+  }
   useEffect(() => { setPanelTab('tongquan') }, [selectedId])
 
   // ----- Panel phải: thu gọn + kéo ngang đổi độ rộng (lưu localStorage) -----
@@ -463,6 +486,7 @@ function Flow() {
 
   const deleteSelected = () => {
     if (!selectedId) return
+    if (nodes.find(n => n.id === selectedId)?.data.type === 'company') return // node gốc — không bao giờ xóa
     if (focusId === selectedId) { // xóa đúng node đang xem riêng -> thoát focus, khôi phục trạng thái thu/mở
       if (focusBackup.current) { setCollapsedIds(focusBackup.current.collapsedIds); focusBackup.current = null }
       setFocusId(null)
@@ -638,7 +662,7 @@ function Flow() {
         <div className="canvas">
           <ReactFlow
             nodes={visibleNodes} edges={visibleEdges}
-            onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
+            onNodesChange={handleNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
             onNodeClick={(_, n) => { setSelectedId(n.id); setPanelCollapsed(false) }} onNodeDoubleClick={(_, n) => enterFocus(n.id)} onPaneClick={() => setSelectedId(null)}
             nodeTypes={nodeTypes} fitView minZoom={0.2} maxZoom={1.8}
             colorMode={dark ? 'dark' : 'light'}
@@ -715,7 +739,9 @@ function Flow() {
                     {edges.every(e => e.source !== selected.id && e.target !== selected.id) && <p className="muted">Chưa có quan hệ nào.</p>}
                   </div>
                   <div className="delete-wrap">
-                    <Button variant="destructive" label="Xóa node này" onClick={deleteSelected} />
+                    {selected.data.type === 'company'
+                      ? <p className="muted">Node gốc (công ty) — không thể xóa.</p>
+                      : <Button variant="destructive" label="Xóa node này" onClick={requestDelete} />}
                   </div>
                 </div>
               )}
@@ -753,6 +779,24 @@ function Flow() {
           </div>
         </div>
       </AppShell>
+
+      {/* Xóa bộ môn rất nguy hiểm: bắt buộc gõ lại đúng tên bộ môn mới cho xóa (mẫu NSDT) */}
+      <Dialog isOpen={delOpen} onOpenChange={(o) => { if (!o) setDelOpen(false) }} width={480}>
+        <DialogHeader title={<Heading level={4}>Xóa bộ môn</Heading>} onOpenChange={() => setDelOpen(false)} />
+        <div style={{ padding: 16 }}>
+          <Stack gap={3}>
+            <Text>
+              Hành động này sẽ xóa vĩnh viễn &ldquo;{selected?.data.title}&rdquo; cùng các quan hệ của nó và không thể hoàn tác.
+              Để xác nhận, hãy gõ lại đúng tên bộ môn vào ô bên dưới.
+            </Text>
+            <TextInput label="Gõ lại tên bộ môn" value={delText} onChange={setDelText} placeholder={selected?.data.title} hasAutoFocus width="100%" />
+            <HStack gap={2} justify="end">
+              <Button variant="ghost" label="Hủy" onClick={() => setDelOpen(false)} />
+              <Button variant="destructive" label="Xóa" isDisabled={delText.trim() !== (selected?.data.title ?? '')} onClick={() => { setDelOpen(false); deleteSelected() }} />
+            </HStack>
+          </Stack>
+        </div>
+      </Dialog>
 
       <CommandPalette
         isOpen={paletteOpen}
