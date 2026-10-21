@@ -5,7 +5,26 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import dagre from 'dagre'
+import { Theme } from '@astryxdesign/core'
+import { AppShell } from '@astryxdesign/core/AppShell'
+import { Button } from '@astryxdesign/core/Button'
+import { CommandPalette } from '@astryxdesign/core/CommandPalette'
+import { DropdownMenu, DropdownMenuItem } from '@astryxdesign/core/DropdownMenu'
+import { Heading } from '@astryxdesign/core/Heading'
+import { HStack } from '@astryxdesign/core/HStack'
+import { IconButton } from '@astryxdesign/core/IconButton'
+import { Selector } from '@astryxdesign/core/Selector'
+import { SideNav } from '@astryxdesign/core/SideNav'
+import { Stack } from '@astryxdesign/core/Stack'
+import { Tab, TabList } from '@astryxdesign/core/TabList'
+import { Text } from '@astryxdesign/core/Text'
+import { TextArea } from '@astryxdesign/core/TextArea'
+import { TextInput } from '@astryxdesign/core/TextInput'
+import { TopNav } from '@astryxdesign/core/TopNav'
+import { TreeList } from '@astryxdesign/core/TreeList'
+import { createStaticSource } from '@astryxdesign/core/Typeahead'
 import { TYPE_META, initialNodesData, initialEdgesData } from './data'
+import { defaultThemeSlug, themes } from '../astryx-themes.js'
 
 // ---------- Auto-layout bằng Dagre (hierarchical, trái -> phải) ----------
 const NODE_W = 250, NODE_H = 92
@@ -77,9 +96,8 @@ const ICONS = {
 }
 function IconBtn({ icon, label, onClick }) {
   return (
-    <button className="icon-btn" onClick={onClick} title={label} aria-label={label}>
-      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{ICONS[icon]}</svg>
-    </button>
+    <IconButton label={label} onClick={onClick} variant="ghost"
+      icon={<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{ICONS[icon]}</svg>} />
   )
 }
 
@@ -450,64 +468,92 @@ function Flow() {
     return (q ? all.filter(n => norm(n.data.title).includes(q) || norm(n.data.subtitle).includes(q)) : all).slice(0, 12)
   }, [nodes, paletteQuery])
 
+  // Command palette THẬT của Astryx: lệnh + mọi node (keywords không dấu)
+  const paletteSource = useMemo(() => createStaticSource([
+    { id: 'cmd-fit', label: 'Xem toàn cảnh sơ đồ', auxiliaryData: { kind: 'cmd', keywords: ['toan canh', 'so do'] } },
+    { id: 'cmd-layout', label: 'Sắp xếp lại bố cục', auxiliaryData: { kind: 'cmd', keywords: ['sap xep', 'bo cuc'] } },
+    { id: 'cmd-collapse', label: 'Thu gọn nhánh phụ', auxiliaryData: { kind: 'cmd', keywords: ['thu gon'] } },
+    ...nodes.map(n => ({ id: `node-${n.id}`, label: n.data.title, auxiliaryData: { kind: 'node', nodeId: n.id, keywords: [norm(n.data.title), norm(TYPE_META[n.data.type].label)] } })),
+  ], { keywords: (item) => item.auxiliaryData?.keywords ?? [] }), [nodes])
+
+  function handlePaletteSelect(id) {
+    if (!id) return
+    if (id.startsWith('node-')) jumpToNode(id.slice(5))
+    else if (id === 'cmd-fit') rf.fitView({ padding: 0.15, duration: 400 })
+    else if (id === 'cmd-layout') relayout()
+    else if (id === 'cmd-collapse') collapseAll()
+    setPaletteOpen(false)
+  }
+
+  // Cây điều hướng cho TreeList của Astryx trong SideNav
+  const treeItems = useMemo(() => {
+    const group = (key, label, type) => ({
+      id: `g-${key}`, label: <Text maxLines={1}>{label}</Text>, isExpanded: true,
+      children: sideGroups[type].map(n => ({ id: `n-${n.id}`, label: <Text maxLines={1}>{n.data.title}</Text>, isSelected: selectedId === n.id, onClick: () => jumpToNode(n.id) })),
+    })
+    return [
+      { id: 'nav-graph', label: <Text maxLines={1}>Sơ đồ quan hệ</Text>, isSelected: true, onClick: () => rf.fitView({ padding: 0.15, duration: 400 }) },
+      group('dept', 'Bộ môn', 'department'),
+      group('emp', 'Nhân viên', 'employee'),
+      group('task', 'Công việc', 'task'),
+      { id: 'nav-report', label: <Text maxLines={1}>Báo cáo (sắp có)</Text>, isDisabled: true },
+      { id: 'nav-settings', label: <Text maxLines={1}>Cài đặt (sắp có)</Text>, isDisabled: true },
+    ]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sideGroups, selectedId])
+
   const counts = useMemo(() => {
     const c = {}; nodes.forEach(n => { c[n.data.type] = (c[n.data.type] || 0) + 1 }); return c
   }, [nodes])
 
   return (
+    <Theme theme={themes[defaultThemeSlug]} mode={themeMode}>
     <div className={`app ${dark ? 'dark' : ''}`}>
-      <header className="shell-top">
-        <button className="icon-btn" onClick={() => setShellSide(s => !s)} title={shellSide ? 'Ẩn thanh điều hướng' : 'Hiện thanh điều hướng'} aria-label="Bật/tắt thanh điều hướng">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
-        </button>
-        <div className="shell-brand"><strong>CRM Miền Tây</strong><span>Sơ đồ quan hệ</span></div>
-        <button className="palette-trigger" onClick={() => setPaletteOpen(true)} title="Tìm node hoặc lệnh (Ctrl+K)">
-          <span>🔍 Tìm node hoặc lệnh…</span><kbd>Ctrl K</kbd>
-        </button>
-        <div className="shell-top-right">
-          <label className="theme-select">Theme
-            <select value={themeMode} onChange={e => setThemeMode(e.target.value)} title="Chọn giao diện sáng / tối">
-              <option value="system">Theo hệ thống</option>
-              <option value="light">Sáng</option>
-              <option value="dark">Tối</option>
-            </select>
-          </label>
-          <button className="account-btn" title="Tài khoản (mẫu)">👤 Tài khoản</button>
-        </div>
-      </header>
-
-      <div className="shell-body">
-        {shellSide && (
-          <nav className="shell-side">
-            <div className="side-item active">🗺️ Sơ đồ quan hệ</div>
-            {[
-              ['department', '📁 Bộ môn', 'dept'],
-              ['employee', '👥 Nhân viên', 'emp'],
-              ['task', '📋 Công việc', 'task'],
-            ].map(([type, label, key]) => (
-              <div key={key}>
-                <div className="side-folder" onClick={() => setFoldersOpen(f => ({ ...f, [key]: !f[key] }))}>
-                  <span>{foldersOpen[key] ? '▾' : '▸'} {label}</span><span className="side-count">{sideGroups[type].length}</span>
-                </div>
-                {foldersOpen[key] && sideGroups[type].map(n => (
-                  <div key={n.id} className={`side-child ${selectedId === n.id ? 'active' : ''}`} title={n.data.title} onClick={() => jumpToNode(n.id)}>{n.data.title}</div>
-                ))}
-              </div>
-            ))}
-            <div className="side-sep" />
-            <div className="side-item disabled" title="Sắp có ở giai đoạn sau">📊 Báo cáo</div>
-            <div className="side-item disabled" title="Sắp có ở giai đoạn sau">⚙️ Cài đặt</div>
-          </nav>
+      <AppShell
+        height="fill"
+        contentPadding={0}
+        topNav={(
+          <TopNav
+            label="Thanh điều hướng chính"
+            heading={(
+              <HStack gap={2} align="center">
+                <IconButton label={shellSide ? 'Ẩn thanh điều hướng' : 'Hiện thanh điều hướng'} variant="ghost" onClick={() => setShellSide(s => !s)}
+                  icon={<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>} />
+                <Heading level={4}>CRM Miền Tây</Heading>
+              </HStack>
+            )}
+            centerContent={(
+              <Stack onClick={() => setPaletteOpen(true)}>
+                <TextInput label="Tìm kiếm" isLabelHidden placeholder="Tìm node hoặc lệnh (Ctrl+K)" value="" onChange={() => {}} isReadOnly startIcon="search" width={340} />
+              </Stack>
+            )}
+            endContent={(
+              <HStack gap={2} align="center">
+                <Selector label="Giao diện" isLabelHidden width={150}
+                  options={[{ value: 'system', label: 'Theo hệ thống' }, { value: 'light', label: 'Sáng' }, { value: 'dark', label: 'Tối' }]}
+                  value={themeMode} onChange={setThemeMode} />
+                <DropdownMenu trigger={<Button variant="ghost" label="Tài khoản">Tài khoản</Button>}>
+                  <DropdownMenuItem label="Quản trị viên" description="admin@mientay.example" />
+                  <DropdownMenuItem label="Đăng xuất" onClick={() => {}} />
+                </DropdownMenu>
+              </HStack>
+            )}
+          />
         )}
-
+        sideNav={shellSide ? (
+          <SideNav label="Điều hướng chính" resizable={{ defaultWidth: 248, minWidth: 180, maxWidth: 400 }}>
+            <TreeList items={treeItems} density="compact" />
+          </SideNav>
+        ) : undefined}
+      >
         <div className="content">
           <div className="toolbar">
             <span className="toolbar-label">Thêm node (nối vào node đang chọn):</span>
-            {Object.entries(TYPE_META).map(([k, m]) => <button key={k} onClick={() => addNode(k)}>{m.icon} {m.label}</button>)}
+            {Object.entries(TYPE_META).map(([k, m]) => <Button key={k} size="sm" label={`${m.icon} ${m.label}`} onClick={() => addNode(k)} />)}
             <span className="sep" />
             <span className="toolbar-label">Lọc loại:</span>
             {Object.entries(TYPE_META).map(([k, m]) => (
-              <label key={k} className="chk"><input type="checkbox" checked={!!typeFilter[k]} onChange={e => setTypeFilter(f => ({ ...f, [k]: e.target.checked }))} /> {m.label} ({counts[k] || 0})</label>
+              <Button key={k} size="sm" variant={typeFilter[k] ? 'primary' : 'secondary'} label={`${m.label} (${counts[k] || 0})`} onClick={() => setTypeFilter(f => ({ ...f, [k]: !f[k] }))} />
             ))}
             <span className="toolbar-spacer" />
             <IconBtn icon="layout" label="Sắp xếp lại" onClick={relayout} />
@@ -565,32 +611,40 @@ function Flow() {
           ) : (
             <div>
               <div className="panel-type" style={{ color: TYPE_META[selected.data.type].color }}>{TYPE_META[selected.data.type].icon} {TYPE_META[selected.data.type].label}</div>
-              {focusId === selected.id
-                ? <button className="focus-btn active" onClick={exitFocus}>✕ Thoát xem riêng</button>
-                : <button className="focus-btn" onClick={() => enterFocus(selected.id)}>◎ Xem riêng node này</button>}
-              <div className="tabs" role="tablist">
-                {[['tongquan', 'Tổng quan'], ['chitiet', 'Chi tiết'], ['hoatdong', 'Hoạt động'], ['tailieu', 'Tài liệu']].map(([k, label]) => (
-                  <button key={k} role="tab" aria-selected={panelTab === k} className={`tab-btn ${panelTab === k ? 'active' : ''}`} onClick={() => setPanelTab(k)}>{label}</button>
-                ))}
+              <div className="focus-btn-wrap">
+                {focusId === selected.id
+                  ? <Button variant="destructive" label="✕ Thoát xem riêng" onClick={exitFocus} />
+                  : <Button label="◎ Xem riêng node này" onClick={() => enterFocus(selected.id)} />}
               </div>
+              <TabList value={panelTab} onChange={setPanelTab} role="tablist" layout="fill" size="sm" hasDivider>
+                {[['tongquan', 'Tổng quan'], ['chitiet', 'Chi tiết'], ['hoatdong', 'Hoạt động'], ['tailieu', 'Tài liệu']].map(([k, label]) => (
+                  <Tab key={k} value={k} label={label} />
+                ))}
+              </TabList>
 
               {panelTab === 'tongquan' && (
                 <div>
-                  <label>Tên / Tiêu đề<input value={selected.data.title} onChange={e => updateSelected({ title: e.target.value })} /></label>
-                  <label>Dòng phụ<input value={selected.data.subtitle} onChange={e => updateSelected({ subtitle: e.target.value })} /></label>
-                  <label>Trạng thái<input value={selected.data.status} onChange={e => updateSelected({ status: e.target.value })} /></label>
-                  <label>Giá trị / Thông tin chính<input value={selected.data.value} onChange={e => updateSelected({ value: e.target.value })} /></label>
-                  <label>Ghi chú<textarea rows={5} value={selected.data.note} onChange={e => updateSelected({ note: e.target.value })} /></label>
+                  <Stack gap={3}>
+                    <TextInput label="Tên / Tiêu đề" value={selected.data.title} onChange={v => updateSelected({ title: v })} />
+                    <TextInput label="Dòng phụ" value={selected.data.subtitle} onChange={v => updateSelected({ subtitle: v })} />
+                    <TextInput label="Trạng thái" value={selected.data.status} onChange={v => updateSelected({ status: v })} />
+                    <TextInput label="Giá trị / Thông tin chính" value={selected.data.value} onChange={v => updateSelected({ value: v })} />
+                    <TextArea label="Ghi chú" value={selected.data.note} onChange={v => updateSelected({ note: v })} />
+                  </Stack>
                   <div className="panel-rel">
                     <h4>Quan hệ của node này</h4>
-                    {edges.filter(e => e.source === selected.id || e.target === selected.id).map(e => {
-                      const otherId = e.source === selected.id ? e.target : e.source
-                      const other = nodes.find(n => n.id === otherId)
-                      return <button key={e.id} className="rel-item" onClick={() => other && setSelectedId(other.id)}>{e.label || 'liên quan'} → {other?.data.title || otherId}</button>
-                    })}
+                    <Stack gap={1}>
+                      {edges.filter(e => e.source === selected.id || e.target === selected.id).map(e => {
+                        const otherId = e.source === selected.id ? e.target : e.source
+                        const other = nodes.find(n => n.id === otherId)
+                        return <Button key={e.id} variant="ghost" size="sm" label={`${e.label || 'liên quan'} → ${other?.data.title || otherId}`} onClick={() => other && setSelectedId(other.id)} />
+                      })}
+                    </Stack>
                     {edges.every(e => e.source !== selected.id && e.target !== selected.id) && <p className="muted">Chưa có quan hệ nào.</p>}
                   </div>
-                  <button className="danger" onClick={deleteSelected}>Xóa node này</button>
+                  <div className="delete-wrap">
+                    <Button variant="destructive" label="Xóa node này" onClick={deleteSelected} />
+                  </div>
                 </div>
               )}
 
@@ -615,7 +669,7 @@ function Flow() {
               {panelTab === 'tailieu' && (
                 <div className="doc-list">
                   {docRows(selected).map(([name, meta]) => (
-                    <div key={name} className="doc-row"><span className="doc-icon">📄</span><span className="doc-main"><span className="doc-name">{name}</span><span className="doc-meta">{meta}</span></span><button onClick={() => alert('Tài liệu mẫu — chưa nối kho file thật.')}>Tải</button></div>
+                    <div key={name} className="doc-row"><span className="doc-icon">📄</span><span className="doc-main"><span className="doc-name">{name}</span><span className="doc-meta">{meta}</span></span><Button size="sm" label="Tải" onClick={() => alert('Tài liệu mẫu — chưa nối kho file thật.')} /></div>
                   ))}
                   <p className="muted">Tài liệu đính kèm theo node (dữ liệu mẫu).</p>
                 </div>
@@ -626,33 +680,18 @@ function Flow() {
         )}
           </div>
         </div>
-      </div>
+      </AppShell>
 
-      {paletteOpen && (
-        <div className="palette-overlay" onClick={() => setPaletteOpen(false)}>
-          <div className="palette" onClick={e => e.stopPropagation()}>
-            <input autoFocus value={paletteQuery} onChange={e => setPaletteQuery(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Escape') setPaletteOpen(false); if (e.key === 'Enter' && paletteNodes[0]) { jumpToNode(paletteNodes[0].id); setPaletteOpen(false); setPaletteQuery('') } }}
-              placeholder="Tìm node… (gõ không dấu cũng được, Enter để nhảy tới kết quả đầu)" />
-            <div className="palette-list">
-              <div className="palette-group">Lệnh</div>
-              <button className="palette-item" onClick={() => { setPaletteOpen(false); rf.fitView({ padding: 0.15, duration: 400 }) }}>🗺️ Xem toàn cảnh sơ đồ</button>
-              <button className="palette-item" onClick={() => { setPaletteOpen(false); relayout() }}>↗ Sắp xếp lại bố cục</button>
-              <button className="palette-item" onClick={() => { setPaletteOpen(false); collapseAll() }}>⊟ Thu gọn nhánh phụ</button>
-              {paletteNodes.length > 0 && <div className="palette-group">Node</div>}
-              {paletteNodes.map(n => (
-                <button key={n.id} className="palette-item" onClick={() => { jumpToNode(n.id); setPaletteOpen(false); setPaletteQuery('') }}>
-                  <span>{TYPE_META[n.data.type].icon}</span><span className="palette-item-title">{n.data.title}</span><span className="palette-item-type">{TYPE_META[n.data.type].label}</span>
-                </button>
-              ))}
-              {paletteQuery && paletteNodes.length === 0 && <div className="palette-empty">Không thấy node nào khớp.</div>}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <footer className="footer">Prototype thử cảm giác dùng — dữ liệu mẫu hư cấu, lưu cục bộ trong trình duyệt. Stack: React Flow (@xyflow/react) + Dagre auto-layout.</footer>
+      <CommandPalette
+        isOpen={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        searchSource={paletteSource}
+        label="Tìm node hoặc lệnh"
+        emptySearchText="Không tìm thấy node hay lệnh nào"
+        onValueChange={handlePaletteSelect}
+      />
     </div>
+    </Theme>
   )
 }
 
