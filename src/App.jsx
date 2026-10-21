@@ -73,10 +73,18 @@ function CrmNode({ id, data, selected }) {
       </div>
       <div className="crm-node-title">{data.title}</div>
       <div className="crm-node-sub">{data.subtitle}</div>
-      <div className="crm-node-foot">
-        <span className="badge" style={{ color: accent, borderColor: data.dark ? meta.darkBorder : meta.border }}>{data.status}</span>
-        <span className="crm-node-value">{data.value}</span>
-      </div>
+      {data.type === 'employee' ? (
+        // Thẻ nhân viên chỉ giữ thông tin cần thiết: bỏ email, trạng thái "Đang làm việc" thu còn 1 ô màu xanh
+        // (đã nghỉ việc = ô xám; rê chuột vào ô xem chữ trạng thái). Email vẫn xem đầy đủ ở panel chi tiết.
+        <div className="crm-node-foot">
+          <span className="status-cell" title={data.status} style={{ background: data.status === 'Đang làm việc' ? '#22c55e' : '#9ca3af' }} />
+        </div>
+      ) : (
+        <div className="crm-node-foot">
+          <span className="badge" style={{ color: accent, borderColor: data.dark ? meta.darkBorder : meta.border }}>{data.status}</span>
+          <span className="crm-node-value">{data.value}</span>
+        </div>
+      )}
       <Handle type="source" position={Position.Right} />
     </div>
   )
@@ -465,6 +473,18 @@ function Flow() {
   }
 
   const relayout = () => {
+    // Đang Xem riêng: CHỈ sắp xếp trong tập node đang xem (như lúc vào focus),
+    // không layout lại toàn đồ thị — layout toàn cục làm các node đang hiện nhảy vị trí lung tung
+    if (focusSet) {
+      setNodes(ns => {
+        const sub = ns.filter(n => focusSet.has(n.id)).map(n => ({ ...n, hidden: false }))
+        const laid = layout(sub, edges.filter(e => focusSet.has(e.source) && focusSet.has(e.target)))
+        const byId = Object.fromEntries(laid.map(n => [n.id, n]))
+        return ns.map(n => byId[n.id] ? { ...n, position: byId[n.id].position } : n)
+      })
+      setTimeout(() => rf.fitView({ padding: 0.2, duration: 400 }), 60)
+      return
+    }
     setNodes(ns => {
       const vis = ns.filter(n => !n.hidden)
       const laid = layout(vis, edges)
