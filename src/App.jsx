@@ -24,7 +24,7 @@ import { TextInput } from '@astryxdesign/core/TextInput'
 import { TopNav } from '@astryxdesign/core/TopNav'
 import { TreeList } from '@astryxdesign/core/TreeList'
 import { createStaticSource } from '@astryxdesign/core/Typeahead'
-import { Building2, ClipboardList, Folder, LogOut, Network, Search, ShieldCheck, User } from 'lucide-react'
+import { Building2, Folder, LogOut, Network, Search, ShieldCheck } from 'lucide-react'
 import { TYPE_META, initialNodesData, initialEdgesData } from './data'
 
 // ---------- Auto-layout bằng Dagre (hierarchical, trái -> phải) ----------
@@ -339,6 +339,48 @@ function Flow() {
     if (pos) setTimeout(() => rf.setCenter(pos.x + 125, pos.y + 45, { zoom: 1.05, duration: 500 }), 80)
   }
 
+  // Bấm 1 tổ chức ở sidebar: tự tách nhánh đó ra xem chi tiết —
+  // mở toàn bộ nhánh (nhân viên + công việc của nhân viên), thu các nhánh tổ chức khác, khung hình vào nhánh
+  function openBranch(deptId) {
+    let basePositions = null
+    if (focusId) {
+      const b = focusBackup.current
+      if (b) { basePositions = b.positions; focusBackup.current = null }
+      setFocusId(null)
+    }
+    const children = (id) => edges.filter(e => e.target === id && !e.secondary).map(e => e.source)
+    const branch = new Set([deptId])
+    children(deptId).forEach(e1 => { branch.add(e1); children(e1).forEach(t => branch.add(t)) })
+    const next = new Set(nodes.filter(n => n.data.type === 'department' && n.id !== deptId).map(n => n.id))
+    setCollapsedIds(next)
+    setNodes(ns => ns.map(n => ({
+      ...n,
+      position: basePositions?.[n.id] ?? n.position,
+      hidden: ancestorChain(n.id).some(a => next.has(a)),
+    })))
+    setSelectedId(deptId); setPanelCollapsed(false)
+    setTimeout(() => rf.fitView({ nodes: [...branch].map(id => ({ id })), padding: 0.25, duration: 500 }), 80)
+  }
+
+  // Bấm "Sơ đồ quan hệ" ở sidebar: về tổng quan — thu mọi nhánh tổ chức, hiện công ty + các tổ chức
+  function resetOverview() {
+    let basePositions = null
+    if (focusId) {
+      const b = focusBackup.current
+      if (b) { basePositions = b.positions; focusBackup.current = null }
+      setFocusId(null)
+    }
+    const next = new Set(nodes.filter(n => n.data.type === 'department').map(n => n.id))
+    setCollapsedIds(next)
+    setNodes(ns => ns.map(n => ({
+      ...n,
+      position: basePositions?.[n.id] ?? n.position,
+      hidden: ancestorChain(n.id).some(a => next.has(a)),
+    })))
+    setSelectedId('co-mientay')
+    setTimeout(() => rf.fitView({ padding: 0.15, duration: 500 }), 80)
+  }
+
   const startResize = (e) => {
     e.preventDefault()
     const onMove = (ev) => setPanelW(Math.min(700, Math.max(260, window.innerWidth - ev.clientX)))
@@ -470,38 +512,33 @@ function Flow() {
     else if (id === 'cmd-collapse') collapseAll()
   }
 
-  // Cây điều hướng cho TreeList — cấu trúc nhóm + icon lucide đúng mẫu dashboard-shell của Ahri
-  const NODE_ICONS = { department: Building2, employee: User, task: ClipboardList }
-  const treeItems = useMemo(() => {
-    const group = (key, label, type) => ({
-      id: `g-${key}`,
-      label: <Text maxLines={1}>{label}</Text>,
+  // Cây điều hướng cho TreeList — chỉ còn Tổng quan + Tổ chức (theo yêu cầu: bỏ menu Nhân sự / Công việc;
+  // bấm vào 1 tổ chức thì canvas tự tách nhánh của tổ chức đó ra xem chi tiết)
+  const treeItems = useMemo(() => [
+    {
+      id: 'g-overview',
+      label: <Text maxLines={1}>Tổng quan</Text>,
       startContent: <Icon icon={Folder} size="xsm" />,
       isExpanded: true,
-      children: sideGroups[type].map(n => ({
+      children: [
+        { id: 'nav-graph', label: <Text maxLines={1}>Sơ đồ quan hệ</Text>, startContent: <Icon icon={Network} size="xsm" />, isSelected: selectedId === 'co-mientay', onClick: () => resetOverview() },
+      ],
+    },
+    {
+      id: 'g-dept',
+      label: <Text maxLines={1}>Tổ chức</Text>,
+      startContent: <Icon icon={Folder} size="xsm" />,
+      isExpanded: true,
+      children: sideGroups.department.map(n => ({
         id: `n-${n.id}`,
         label: <Text maxLines={1}>{n.data.title}</Text>,
-        startContent: <Icon icon={NODE_ICONS[type]} size="xsm" />,
+        startContent: <Icon icon={Building2} size="xsm" />,
         isSelected: selectedId === n.id,
-        onClick: () => jumpToNode(n.id),
+        onClick: () => openBranch(n.id),
       })),
-    })
-    return [
-      {
-        id: 'g-overview',
-        label: <Text maxLines={1}>Tổng quan</Text>,
-        startContent: <Icon icon={Folder} size="xsm" />,
-        isExpanded: true,
-        children: [
-          { id: 'nav-graph', label: <Text maxLines={1}>Sơ đồ quan hệ</Text>, startContent: <Icon icon={Network} size="xsm" />, isSelected: true, onClick: () => rf.fitView({ padding: 0.15, duration: 400 }) },
-        ],
-      },
-      group('dept', 'Tổ chức', 'department'),
-      group('emp', 'Nhân sự', 'employee'),
-      group('task', 'Công việc', 'task'),
-    ]
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sideGroups, selectedId])
+  ], [sideGroups, selectedId])
 
   const counts = useMemo(() => {
     const c = {}; nodes.forEach(n => { c[n.data.type] = (c[n.data.type] || 0) + 1 }); return c
